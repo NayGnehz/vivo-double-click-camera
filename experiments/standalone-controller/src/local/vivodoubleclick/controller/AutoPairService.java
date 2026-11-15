@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** One-shot Settings UI assistance. It neither filters keys nor operates the camera daemon. */
+/** System-bound pairing/approval helper; its network events can trigger bounded recovery. No key filtering. */
 public final class AutoPairService extends AccessibilityService {
     private static final String SETTINGS = "com.android.settings";
     private static final AtomicBoolean IN_FLIGHT = new AtomicBoolean();
@@ -43,13 +43,22 @@ public final class AutoPairService extends AccessibilityService {
     private WifiApprovalUi approvalUi;
     private ConnectivityManager connectivity;
     private boolean networkRegistered;
+    private BoundRecovery recovery;
     private boolean unlockRegistered;
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
-        @Override public void onAvailable(Network network) { RecoveryScheduler.onNetworkAvailable(AutoPairService.this, network); }
+        @Override public void onAvailable(Network network) { networkReady(network); }
+        @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) networkReady(network);
+        }
+        private void networkReady(Network network) {
+            RecoveryScheduler.onNetworkAvailable(AutoPairService.this, network);
+            if (recovery != null) recovery.request();
+        }
     };
     private final BroadcastReceiver unlocked = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             RecoveryScheduler.onUserPresent(context);
+            if (recovery != null) recovery.request();
             if (WifiApprovalSession.active()) main.post(scanTask);
         }
     };
@@ -97,12 +106,14 @@ public final class AutoPairService extends AccessibilityService {
         live = new WeakReference<>(this);
         approvalUi = new WifiApprovalUi(this, main);
         connectivity = getSystemService(ConnectivityManager.class);
+        recovery = new BoundRecovery(this, main);
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(unlocked, new IntentFilter(Intent.ACTION_USER_PRESENT), Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(unlocked, new IntentFilter(Intent.ACTION_USER_PRESENT));
         unlockRegistered = true;
         PairingSession.attach(this);
         updateWorkState();
         RecoveryScheduler.schedule(this);
+        recovery.request();
     }
 
     void scheduleLaunch(long token) {
@@ -325,6 +336,7 @@ public final class AutoPairService extends AccessibilityService {
 
     @Override public void onDestroy() {
         connected = false;
+        if (recovery != null) recovery.close();
         if (live.get() == this) live.clear();
         if (networkRegistered && connectivity != null) connectivity.unregisterNetworkCallback(networkCallback);
         if (unlockRegistered) unregisterReceiver(unlocked);

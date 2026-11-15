@@ -64,6 +64,7 @@ public final class MainActivity extends Activity {
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (prefs, key) -> {
         if ("restore_update".equals(key)) handler.post(() -> {
             if (destroyed || busy || pairingActive()) return;
+            detail.setText(preferences.getString("restore_message", "暂无记录。"));
             if (preferences.getBoolean("restore_ok", false) && RecoveryScheduler.recentlyVerified(this)) renderRecovered();
             else refreshIfNeeded();
         });
@@ -106,6 +107,7 @@ public final class MainActivity extends Activity {
         primaryButton(actions, "启动", v -> runAction("start"));
         primaryButton(actions, "停止", v -> runAction("stop"));
         text(panel, "关闭界面后，双击相机继续运行。", 14).setTextColor(Color.DKGRAY);
+        operations.add(button(panel, "关闭控制界面", v -> closeControlInterface()));
         settingsToggle = button(panel, "设置  ▾", v -> setSettingsExpanded(settingsPanel.getVisibility() != View.VISIBLE));
         settingsPanel = new LinearLayout(this);
         settingsPanel.setOrientation(LinearLayout.VERTICAL);
@@ -159,11 +161,10 @@ public final class MainActivity extends Activity {
         advancedPanel.addView(connectPort);
         text(advancedPanel, "连接端口通常留空。配对码窗口中的端口不能用于连接。", 14);
         text(advancedPanel, "检查实时状态需要临时开启无线调试。检查正常后会关闭无线调试，保留 USB 调试。", 14);
-        detail = text(advancedPanel, "暂无记录。", 13);
+        detail = text(advancedPanel, preferences.getString("restore_message", "暂无记录。"), 13);
         detail.setTextIsSelectable(true);
         detail.setVisibility(View.GONE);
         button(advancedPanel, "查看运行记录", v -> detail.setVisibility(detail.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
-        operations.add(button(settingsPanel, "关闭控制界面", v -> closeControlInterface()));
         setContentView(scroll);
         if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::closeControlInterface);

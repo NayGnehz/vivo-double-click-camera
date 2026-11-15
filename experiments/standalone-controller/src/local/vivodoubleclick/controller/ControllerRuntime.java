@@ -9,8 +9,12 @@ import org.json.JSONObject;
 final class ControllerRuntime {
     private static final ReentrantLock OPERATION = new ReentrantLock();
     static JSONObject execute(Context context, String action, int port, ControllerFlow.Cancellation cancellation) throws Exception {
+        return execute(context, action, port, cancellation, phase -> { });
+    }
+    static JSONObject execute(Context context, String action, int port, ControllerFlow.Cancellation cancellation,
+                              ControllerFlow.Progress progress) throws Exception {
         OPERATION.lockInterruptibly();
-        try { return ControllerFlow.run(action, new Gateway(context.getApplicationContext(), port, cancellation), cancellation); }
+        try { return ControllerFlow.run(action, new Gateway(context.getApplicationContext(), port, cancellation), cancellation, progress); }
         finally { OPERATION.unlock(); }
     }
     static void closeInterface(Context context) throws Exception {
@@ -31,7 +35,7 @@ final class ControllerRuntime {
         }
         public void connect() throws Exception {
             manager = new LocalAdbManager(context);
-            WifiApprovalSession.begin(60_000L);
+            WifiApprovalSession.begin(90_000L);
             if (DebuggingSettings.canWrite(context)) {
                 openedWireless = DebuggingSettings.wireless(context) != 1;
                 if (!Settings.Global.putInt(context.getContentResolver(), "adb_wifi_enabled", 1))
@@ -40,10 +44,12 @@ final class ControllerRuntime {
             // A network-confirmation dialog can precede mDNS publication. Retry discovery
             // only within this short operation, never as an idle background polling loop.
             boolean connected = false;
-            for (int attempt = 0; attempt < 2 && !connected; attempt++) {
+            for (int attempt = 0; attempt < 3 && !connected; attempt++) {
                 cancellation.check();
                 try { connected = manager.connectLocal(port); }
-                catch (Exception failure) { if (attempt == 1) throw failure; }
+                catch (InterruptedException cancelled) { throw cancelled; }
+                catch (Exception failure) { if (attempt == 2) throw failure; }
+                if (!connected && attempt < 2) { cancellation.check(); Thread.sleep(1_000L); }
             }
             if (!connected) throw new IOException("No local wireless debugging connection");
             shell = new AdbShell(manager);

@@ -111,8 +111,57 @@ public final class RecoveryBehaviorTest {
         check((AccessibilityWorkPolicy.eventMask(true)&0x800)!=0,"active authorization receives content updates");
         check(!RecoveryPolicy.recentSuccess(10,10,60_000,6000),"historical state cannot trigger verified-success exit");
     }
+    private static void backgroundRace() throws Exception {
+        check(RecoveryPolicy.sameJob(10,1,10,1),"stop callback matches its own scheduled generation");
+        check(!RecoveryPolicy.sameJob(10,2,10,1),"old stop callback cannot cancel or reschedule a newer job");
+        check(!RecoveryPolicy.sameJob(11,1,10,1),"previous boot callback cannot cancel current job");
+        check(RecoveryPolicy.sameJob(10,-1,10,-1),"legacy pending job can still cancel its own work");
+        RecoveryGate gate = new RecoveryGate();
+        RecoveryGate.Ticket job = gate.claim();
+        check(job != null, "job owns first recovery");
+        for (int event=0; event<100; event++) {
+            check(gate.claim()==null,"network/helper callbacks cannot duplicate active recovery");
+            check(RecoveryPolicy.keepPendingJob(true,10,10),"new network does not replace same-boot job");
+        }
+        gate.cancel();
+        check(job.cancelled(),"manual stop cancels the owning automatic task");
+        gate.release(job);
+        RecoveryGate.Ticket helper=gate.claim();
+        check(helper!=null&&!helper.cancelled(),"next owner has independent cancellation");
+        gate.release(job);
+        check(gate.busy(),"late job completion cannot release helper's lease");
+        job.cancel();
+        check(!helper.cancelled(),"late cancellation cannot cancel a different owner");
+        gate.release(helper);
+        check(!gate.busy(),"completion releases the worker");
+        check(!RecoveryPolicy.keepPendingJob(false,10,10),"create missing persistent fallback");
+        check(!RecoveryPolicy.keepPendingJob(true,9,10),"replace previous-boot metadata when idle");
+        check(!RecoveryPolicy.keepPendingJob(true,-1,-1),"unknown boot is not reusable");
+        java.util.concurrent.CountDownLatch ready=new java.util.concurrent.CountDownLatch(12);
+        java.util.concurrent.CountDownLatch fire=new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger won=new java.util.concurrent.atomic.AtomicInteger();
+        List<Thread> threads=new ArrayList<>();
+        for(int i=0;i<12;i++) {
+            Thread t=new Thread(()->{
+                ready.countDown();
+                try { fire.await(); } catch(InterruptedException e) { throw new AssertionError(e); }
+                if(gate.claim()!=null) won.incrementAndGet();
+            }); threads.add(t);t.start();
+        }
+        check(ready.await(5,java.util.concurrent.TimeUnit.SECONDS),"all event sources are ready");
+        fire.countDown();for(Thread t:threads)t.join(5000);
+        check(won.get()==1,"simultaneous job, unlock and network events create one owner");
+        List<String> phases=new ArrayList<>();
+        Gateway gateway=new Gateway();
+        ControllerFlow.run("start",gateway,()->{},phases::add);
+        check(phases.equals(Arrays.asList("connect","usb","start","usb","cleanup")),"automatic approval continues through startup and cleanup");
+        phases.clear();gateway=new Gateway();gateway.failure="start";
+        try { ControllerFlow.run("start",gateway,()->{},phases::add); throw new AssertionError("expected failure"); }
+        catch (Exception expected) { check(phases.get(phases.size()-1).equals("start"),"failed stage is retained without private exception text"); }
+        check(!RecoveryPolicy.phaseMessage("cleanup").equals(RecoveryPolicy.phaseMessage("connect")),"cleanup and connection failure remain distinguishable");
+    }
     public static void main(String[] ignored) throws Exception {
-        recovery();approvals();flow();reopen();
+        recovery();approvals();flow();reopen();backgroundRace();
         System.out.println("RecoveryBehaviorTest: "+checks+" assertions passed");
     }
 }

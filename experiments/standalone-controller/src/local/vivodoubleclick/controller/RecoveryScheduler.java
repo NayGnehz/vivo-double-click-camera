@@ -39,17 +39,20 @@ final class RecoveryScheduler {
     }
     static synchronized void schedule(Context context) {
         JobScheduler scheduler = context.getSystemService(JobScheduler.class);
-        if (scheduler == null || !needed(context)) return;
+        if (scheduler == null || !needed(context) || AutomaticRecovery.GATE.busy()) return;
         SharedPreferences p = prefs(context);
         int attempts = p.getInt("restore_attempt_boot", -2) == boot(context) ? p.getInt("restore_attempts", 0) : 0;
         if (!RecoveryPolicy.mayAttempt(attempts)) return;
-        long handle = p.getLong("restore_network_handle", -1);
         JobInfo pending = scheduler.getPendingJob(JOB_ID);
-        if (pending != null && pending.getExtras().getInt("boot", -2) == boot(context)
-                && pending.getExtras().getLong("network", -1) == handle) return;
+        // A Wi-Fi request already covers later networks. Replacing the same job ID
+        // would stop an executing authorization/startup attempt.
+        if (RecoveryPolicy.keepPendingJob(pending != null,
+                pending == null ? -2 : pending.getExtras().getInt("boot", -2), boot(context))) return;
         PersistableBundle extras = new PersistableBundle();
         extras.putInt("boot", boot(context));
-        extras.putLong("network", handle);
+        long generation = p.getLong("restore_job_generation", 0) + 1;
+        p.edit().putLong("restore_job_generation", generation).apply();
+        extras.putLong("generation", generation);
         NetworkRequest network = new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build();
         JobInfo job = new JobInfo.Builder(JOB_ID, new ComponentName(context, RecoveryJobService.class))
@@ -79,25 +82,32 @@ final class RecoveryScheduler {
         return true;
     }
     static boolean mayRetry(Context context) {
-        return needed(context) && RecoveryPolicy.mayAttempt(prefs(context).getInt("restore_attempts", 0));
+        SharedPreferences p = prefs(context);
+        int count = p.getInt("restore_attempt_boot", -2) == boot(context) ? p.getInt("restore_attempts", 0) : 0;
+        return needed(context) && RecoveryPolicy.mayAttempt(count);
     }
     static void success(Context context) {
-        prefs(context).edit().remove("controller_stopped_boot").putInt("restore_completed_boot", boot(context))
+        prefs(context).edit().remove("restore_wait_unlock").remove("controller_stopped_boot").putInt("restore_completed_boot", boot(context))
                 .putLong("restore_verified_elapsed", SystemClock.elapsedRealtime())
                 .putString("restore_message", "正在运行；无线调试已关闭，USB 调试保留。")
                 .putBoolean("restore_ok", true).putLong("restore_update", SystemClock.elapsedRealtime()).apply();
     }
+    static void progress(Context context, String phase) {
+        prefs(context).edit().putString("restore_phase", phase)
+                .putString("restore_message", RecoveryPolicy.phaseMessage(phase))
+                .putLong("restore_update", SystemClock.elapsedRealtime()).apply();
+    }
     static void failed(Context context) {
         prefs(context).edit().putBoolean("restore_ok", false)
-                .putString("restore_message", "自动恢复未完成。请检查无障碍助手、Wi-Fi 和调试授权；本次联网最多尝试三次。")
+                .putString("restore_message", "自动启动未完成：" + RecoveryPolicy.phaseFailure(prefs(context).getString("restore_phase", "connect")) + " 本次联网最多尝试三次。")
                 .putLong("restore_update", SystemClock.elapsedRealtime()).apply();
     }
     static void waitForUnlock(Context context) { prefs(context).edit().putBoolean("restore_wait_unlock", true).apply(); }
     static void onUserPresent(Context context) {
-        if (!prefs(context).getBoolean("restore_wait_unlock", false)) return;
-        prefs(context).edit().putBoolean("restore_wait_unlock", false).putInt("restore_attempts", 0).apply();
-        JobScheduler scheduler = context.getSystemService(JobScheduler.class);
-        if (scheduler != null) scheduler.cancel(JOB_ID);
+        if (prefs(context).getBoolean("restore_wait_unlock", false))
+            prefs(context).edit().putBoolean("restore_wait_unlock", false).putInt("restore_attempts", 0).apply();
+        // Also cover first unlock when earlier boot/network callbacks arrived locked.
+        // Never cancel a job already finishing an authorized startup.
         schedule(context);
     }
     static boolean recentlyVerified(Context context) {
@@ -115,6 +125,7 @@ final class RecoveryScheduler {
                 .remove("restore_completed_boot").putLong("restore_verified_elapsed", 0).apply();
     }
     static void manualAction(Context context, String action) {
+        if (!"status".equals(action)) AutomaticRecovery.GATE.cancel();
         if ("stop".equals(action)) prefs(context).edit().putInt("restore_suppressed_boot", boot(context)).apply();
         if ("start".equals(action)) prefs(context).edit().remove("restore_suppressed_boot").apply();
         JobScheduler scheduler = context.getSystemService(JobScheduler.class);
@@ -126,6 +137,7 @@ final class RecoveryScheduler {
             prefs(context).edit().remove("restore_suppressed_boot").putInt("restore_attempts", 0).apply();
             schedule(context);
         } else {
+            AutomaticRecovery.GATE.cancel();
             JobScheduler scheduler = context.getSystemService(JobScheduler.class);
             if (scheduler != null) scheduler.cancel(JOB_ID);
         }

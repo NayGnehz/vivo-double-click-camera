@@ -4,7 +4,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
-/** Explicit, bounded authorization to click Allow once; idle services receive no window events. */
+/** Explicit, bounded authorization to click Allow once; idle services never inspect windows. */
 final class WifiApprovalSession {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static long deadline;
