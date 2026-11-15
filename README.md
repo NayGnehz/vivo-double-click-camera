@@ -1,58 +1,62 @@
 # vivo 双击电源键打开相机
 
-为 vivo X300 / OriginOS 6（Android 16）制作的双击电源键相机快捷方式。无需 root、Shizuku、Key Mapper 或 Tasker。
+面向 vivo X300 / OriginOS 6 的双击电源键相机快捷方式，无需 root、Shizuku、Key Mapper 或 Tasker。控制器最低 Android 12，native ABI 为 arm64-v8a。
 
-## 下载与使用
+## 下载与首次设置
 
-1.0-standalone.8 使用系统 TLS 1.3 与公开 TLS exporter 接口，并精简 RSA 身份 Provider。APK 约 0.45 MB，较原始 4.41 MB 减少约 90%。最低 Android 12（API 31）；X300 / OriginOS 6 满足此要求。保留旧系统支持的 .7 仍可下载。SPAKE2 和监听核心保持原字节。身份生成与证书校验 16 项断言、退出策略 16 项断言，以及未裁剪/裁剪构建之间的双向身份兼容测试通过；本版尚未真机验收。
+到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.9.apk`，可使用原签名覆盖升级，请勿为升级而卸载或清除数据。
 
-到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.8.apk`。控制器支持 arm64-v8a，最低 Android 12；此前版本只在 X300 / OriginOS 6 上验证，本版退出调试开关改动已通过构建和回归测试，尚未真机验收。
+1. 将系统“双击电源键”设为“无功能”，关闭其他工具的按键拦截；开启开发者选项和 USB 调试。
+2. 在“配对与设置”中保留“开机和 Wi-Fi 联网后自动恢复”开关，打开系统无障碍设置，启用“双击相机：自动恢复助手”。升级后原助手开关若已关闭，需要手动开启一次。
+3. 在 OriginOS 中允许本应用自启动，并放行必要的后台运行。此项由用户在系统设置完成。
+4. 若尚未配对，连接 Wi-Fi，点“首次自动配对”，按提示开启无线调试。助手会识别网络授权窗口，仅允许本次调试，不勾“始终允许”，再打开配对窗口并完成本机配对；自动识别不适配时可手动操作或使用备用配对。
+5. 已配对后，系统任务会在 Wi-Fi 就绪时尝试恢复；也可手动点“启动 1.0”。首次成功连接会申请后续自动控制调试开关所需的 WRITE_SECURE_SETTINGS 授权。
 
-1. 将系统“双击电源键”设为“无功能”，关闭其他工具的按键拦截。
-2. 安装 APK，连接 Wi-Fi（无需互联网），开启开发者选项。
-3. 打开 App，点“自动配对”，按提示临时开启首次配对助手无障碍服务，再开启无线调试并确认当前网络。自动配对不适配时使用“手动配对（备用）”。
-4. 配对成功后点“启动 1.0”。确认正在运行后即可关闭控制界面。
+配对身份保留在应用私有、凭据加密的存储中；重启不会生成新身份。清除数据、卸载或撤销调试授权后可能需要重新配对。
 
-首次配对助手只在主动发起后的 120 秒内接收系统设置窗口事件，成功后关闭自身；它不拦截按键。配对身份由 App 在运行时生成并保存在 App 私有目录，配对码不写日志或偏好设置。
+## 重启与晚些联网
 
-运行期间请保留 USB 调试开关，不要求插 USB 线。手机重启后，重新连接 Wi-Fi、打开 App 并点“启动 1.0”；它不会自动开机恢复。查询、启动、停止需要本机无线调试连接，切换网络可能需要重新确认。清除 App 数据或卸载会丢失配对。
+手机重启后先解锁一次。系统持久化任务等待 Wi-Fi 条件，稍后才连接 Wi-Fi 也能触发恢复，不需要开机时立即联网，不要求 Wi-Fi 能访问互联网。
 
-`1.0-standalone.6` 点击“关闭控制界面”时，如果 USB 调试已开启，会先关闭无线调试，回读确认后再退出；保留 USB 调试和已运行的监听器。USB 调试未开启时不改无线调试。无法确认设置时保持界面打开并提示处理。再次打开控制器查询、启动或停止时，可能重新开启无线调试。
+需要网络确认时，助手只处理系统无线调试授权窗口：若“始终允许”已经勾上，先取消并回读，再点一次“允许”。不会自动批准其他类型的授权弹窗，也不新建永久网络信任。已有系统信任记录不会被删除。
 
-独立监听器以 Android shell 权限只读监听物理按键，不独占输入设备，不吞掉系统按键，也不开放网络端口。相机通过系统安全相机入口启动。退出控制 App 不等于停止监听器，请用 App 的“停止 1.0”。
+确认监听器正常运行后，保持 USB 调试开启，关闭无线调试并回读确认。控制界面若在前台，显示正常运行一秒后移除；后台恢复不会主动打开控制界面。不要求插 USB 线。恢复成功后，本次开机的后续 Wi-Fi 切换不会反复启动监听器或开启无线调试。
+
+手动点“停止”会暂停本次开机期间的自动恢复；下次重启仍按开关设置恢复。关闭自动恢复开关则停止后续自动恢复任务。设置或状态未确认时不自动关闭界面。
+
+如果新网络授权发生在锁屏期间，等待用户解锁后再处理，不自动解锁或保持屏幕常亮。同一次网络连接最多尝试三次，换网络或锁屏失败后的解锁事件可重新触发；失败信息保存在 App 内。
+
+## 待机与耗电
+
+助手保留无障碍授权，但待机时窗口事件类型为 0，不读取其他应用窗口。仅配对或短时网络授权期间接收系统设置和 SystemUI 的窗口事件；已移除每 500 毫秒循环读取窗口的逻辑。等待联网由系统任务与网络事件驱动，不主动扫描 Wi-Fi、不常持唤醒锁、不使用轮询保活或常驻前台服务。
+
+原版 1.0 监听器继续以 shell 权限只读监听实体按键，不独占设备、不吞掉系统按键；无障碍助手不负责日常按键检测。实际新增耗电尚未在真机测量，不能承诺零耗电。
 
 ## 电脑 ADB 方式
 
-也可下载并解压 `VivoCamera-Core-1.0.zip`，用自己安装的 Android platform-tools 启动：
+`VivoCamera-Core-1.0.zip` 保留独立电脑启动方式，解压后执行：
 
 ```powershell
 .\Start-VivoCamera.ps1 -AdbPath 'C:\Android\platform-tools\adb.exe'
-.\Start-VivoCamera.ps1 -AdbPath 'C:\Android\platform-tools\adb.exe' -DoubleMs 350 -DelayMs 250
 .\Stop-VivoCamera.ps1 -AdbPath 'C:\Android\platform-tools\adb.exe'
 ```
 
-多个设备时加 `-Serial 'DEVICE_SERIAL'`。`-DryRun` 只检测双击；双击间隔支持 150–600 ms，第二次松开后等待支持 0–1000 ms，默认分别为 350 和 150 ms。看到 `READY` 后可拔线，重启后需重新启动。
+多个设备时加 `-Serial 'DEVICE_SERIAL'`。可用 `-DoubleMs 350 -DelayMs 150` 调整时序，或 `-DryRun` 只检测双击。电脑方式在手机重启后仍需重新启动。
 
 ## 源码与构建
 
-`src/` 是 1.0 核心，`tests/` 是检测器回归测试，`experiments/standalone-controller/` 是已发布控制器源码。
-
-Release 的 `VivoCamera-Controller-source-public.zip` 包含与仓库相同的源码、固定第三方 JAR/native 输入、许可证和 LGPL 对应源码，供独立重建和重新链接。仓库本身不包含第三方依赖二进制；克隆后可从该源码包取出对应的 `libs/`、`native/` 和 `assets/vivo-camera.jar`。
-
-在解压后控制器目录运行（PowerShell 7、JDK 17、Android SDK platform android-37.0、build-tools 36.0.0）：
+`src/` 为冻结的 1.0 核心；`experiments/standalone-controller/` 为控制器。Release 的 `VivoCamera-Controller-source-public.zip` 包含相同源码、固定依赖、裁剪规则、许可证、LGPL 对应源码及重新链接材料。使用 JDK 17、Android SDK android-37.0 / build-tools 36.0.0，在控制器目录执行：
 
 ```powershell
 .\Build-Standalone.ps1 -JdkPath 'C:\Tools\jdk-17' -SdkPath 'C:\Android\Sdk' -WorkRoot 'C:\BuildCache\vivo'
 ```
 
-产物在 `<WorkRoot>/dist/`；构建只使用已有依赖，不下载工具。签名使用该工作目录中新生成的开发密钥，无法直接覆盖本 Release 的签名安装包。开发密钥不随源码包分发。最低 API 31，native ABI 为 arm64-v8a。SPAKE2 的修改和重新链接步骤见控制器 `third-party-source/README.md`。
+输出位于 `<WorkRoot>/dist/`，开发签名与正式 APK 不同。仓库本身不包含依赖二进制，克隆后可从完整源码包取出 `libs/`、`native/` 和 `assets/vivo-camera.jar`。`Build-Standalone-Local.ps1` 与根构建入口保留维护者的共享 `_env` 工作流。
 
-仓库根 `Build.ps1` / `Build.cmd` 及控制器 `Build-Standalone-Local.ps1` 保留维护者共享 `_env` 构建入口；使用它们需要单独恢复该固定共享环境，不属于独立源码包的必备步骤。
+## 验证范围
 
-## 限制与验证范围
+恢复/授权/退出行为回归、身份与证书校验、退出策略、旧新身份格式双向兼容及主机 TLS 1.3 双向认证回环测试通过；APK 构建、正式签名与 ZIP 对齐检查通过。核心 JAR、SPAKE2 JNI 保持原字节。
 
-核心检测器包含 185 项断言，退出策略另有回归测试。原版在 X300 / OriginOS 6 上验证过监听器启动、主动停止和双击打开相机。本版 APK 由修改后的源码构建，沿用既有正式签名，可作为原签名应用的更新；核心 JAR 保持原字节。尚未对本版退出行为进行真机验证。
+本版的 OriginOS 开机广播、延后联网、系统授权弹窗点击、后台任务送达、锁屏恢复及实际待机耗电尚未真机验收。系统调度可能延后，厂商后台限制、关闭助手、强制停止应用、撤销权限或系统升级均可能影响恢复；需要保留手动启停作为备用。
 
-系统升级可能改变 shell 读取输入或启动相机的权限。系统仍处理电源键亮灭屏；若刚打开相机又关屏，可调整等待时间。长时间待机、完全断网拔线组合、重启恢复及 OriginOS 7 仍需进一步验证。
-
-第三方许可、署名和对应源码保留在控制器的 `THIRD_PARTY_NOTICES.md`、`assets/licenses/` 和 `third-party-source/`。项目自有代码尚未另行授予开源许可证；第三方组件继续适用其原许可。
+第三方许可见控制器 THIRD_PARTY_NOTICES.md、assets/licenses/ 和 third-party-source/。项目自有代码尚未另行授予开源许可证；第三方组件适用其原许可。

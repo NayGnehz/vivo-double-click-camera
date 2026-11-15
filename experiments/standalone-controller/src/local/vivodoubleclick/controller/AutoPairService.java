@@ -3,6 +3,15 @@ package local.vivodoubleclick.controller;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.res.Resources;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
+import java.lang.ref.WeakReference;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -29,6 +38,47 @@ public final class AutoPairService extends AccessibilityService {
     private long incompleteToken;
     private long incompleteSince;
     private boolean connected;
+    private static WeakReference<AutoPairService> live = new WeakReference<>(null);
+    private WifiApprovalUi approvalUi;
+    private ConnectivityManager connectivity;
+    private boolean networkRegistered;
+    private boolean unlockRegistered;
+    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
+        @Override public void onAvailable(Network network) { RecoveryScheduler.onNetworkAvailable(AutoPairService.this, network); }
+    };
+    private final BroadcastReceiver unlocked = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            RecoveryScheduler.onUserPresent(context);
+            if (WifiApprovalSession.active()) main.post(scanTask);
+        }
+    };
+    static void refreshConnected() {
+        AutoPairService service = live.get();
+        if (service != null) service.main.post(service::updateWorkState);
+    }
+    void updateWorkState() {
+        if (!connected) return;
+        AccessibilityServiceInfo info = getServiceInfo();
+        if (info != null) {
+            info.eventTypes = AccessibilityWorkPolicy.needsWindowEvents(PairingSession.isActive(), WifiApprovalSession.active())
+                    ? AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED : 0;
+            info.packageNames = WifiApprovalSession.active() ? new String[]{SETTINGS, "com.android.systemui"} : new String[]{SETTINGS};
+            info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
+            info.notificationTimeout = 100;
+            setServiceInfo(info);
+        }
+        if (RecoveryScheduler.enabled(this) && !networkRegistered && connectivity != null) {
+            NetworkRequest wifi = new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build();
+            connectivity.registerNetworkCallback(wifi, networkCallback, main);
+            networkRegistered = true;
+        } else if (!RecoveryScheduler.enabled(this) && networkRegistered) {
+            connectivity.unregisterNetworkCallback(networkCallback);
+            networkRegistered = false;
+        }
+        main.removeCallbacks(scanTask);
+        if (PairingSession.isActive() || WifiApprovalSession.active()) main.post(scanTask);
+    }
     private Resources settingsResources;
     private final Runnable scanTask = this::scan;
 
@@ -46,7 +96,15 @@ public final class AutoPairService extends AccessibilityService {
         try { settingsResources = getPackageManager().getResourcesForApplication(SETTINGS); }
         catch (Exception unavailable) { settingsResources = null; }
         connected = true;
+        live = new WeakReference<>(this);
+        approvalUi = new WifiApprovalUi(this, main);
+        connectivity = getSystemService(ConnectivityManager.class);
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(unlocked, new IntentFilter(Intent.ACTION_USER_PRESENT), Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(unlocked, new IntentFilter(Intent.ACTION_USER_PRESENT));
+        unlockRegistered = true;
         PairingSession.attach(this);
+        updateWorkState();
+        RecoveryScheduler.schedule(this);
     }
 
     void scheduleLaunch(long token) {
@@ -59,21 +117,23 @@ public final class AutoPairService extends AccessibilityService {
                 return;
             }
             PairingSession.progress(token, "waiting_wireless",
-                    "已打开无线调试设置。请手动开启无线调试并确认系统网络提示，助手会自动打开配对窗口。");
+                    "已打开无线调试设置。请开启无线调试；助手会尝试仅允许本次网络调试，并自动打开配对窗口。");
             main.removeCallbacks(scanTask);
             main.postDelayed(scanTask, 500);
         }, 500);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (!connected || !PairingSession.isActive() || event == null
-                || !SETTINGS.contentEquals(event.getPackageName() == null ? "" : event.getPackageName())) return;
-        if (SystemClock.elapsedRealtime() - lastScan < 150) return;
+        if (!connected || event == null) return;
+        String owner = event.getPackageName() == null ? "" : event.getPackageName().toString();
+        if (!(PairingSession.isActive() && SETTINGS.equals(owner))
+                && !(WifiApprovalSession.active() && WifiApprovalUi.packageAllowed(owner))) return;
         main.removeCallbacks(scanTask);
         main.postDelayed(scanTask, 100);
     }
 
     private void scan() {
+        if (connected && WifiApprovalSession.active()) approvalUi.scan();
         long token = PairingSession.activeToken();
         if (!connected || !PairingSession.isWaiting(token)) return;
         lastScan = SystemClock.elapsedRealtime();
@@ -105,13 +165,13 @@ public final class AutoPairService extends AccessibilityService {
             if (!snapshot.dialogTitle && !snapshot.codeLabel && clickedToken != token
                     && clickPairingEntry(root, 0)) {
                 clickedToken = token;
+                main.postDelayed(scanTask, 150);
                 PairingSession.progress(token, "opening_pairing_window", "已点击配对入口，正在等待系统配对窗口…");
             }
         } catch (RuntimeException staleWindow) {
             // A Settings window can disappear during traversal. Wait for a fresh tree.
         } finally {
             if (root != null) root.recycle();
-            if (PairingSession.isWaiting(token)) main.postDelayed(scanTask, 500);
         }
     }
 
@@ -266,6 +326,9 @@ public final class AutoPairService extends AccessibilityService {
 
     @Override public void onDestroy() {
         connected = false;
+        if (live.get() == this) live.clear();
+        if (networkRegistered && connectivity != null) connectivity.unregisterNetworkCallback(networkCallback);
+        if (unlockRegistered) unregisterReceiver(unlocked);
         main.removeCallbacksAndMessages(null);
         PairingSession.detach(this);
         super.onDestroy();

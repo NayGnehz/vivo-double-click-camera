@@ -37,6 +37,7 @@ public final class PairingSession {
         final long token = ++generation;
         deadline = SystemClock.elapsedRealtime() + LIMIT_MS;
         armed = true;
+        WifiApprovalSession.begin(LIMIT_MS);
         pairing = false;
         progressStage = "";
         write("pending", "等待一次性配对。请按系统提示手动开启无线调试并确认网络。", false);
@@ -46,11 +47,12 @@ public final class PairingSession {
                     if (!armed || token != generation) return;
                     if (!isActive()) return;
                     // Handler uses uptime; recheck elapsed time shortly after a wake-up.
-                    MAIN.postDelayed(this, Math.min(1_000L, deadline - SystemClock.elapsedRealtime()));
+                    MAIN.postDelayed(this, Math.max(1L, deadline - SystemClock.elapsedRealtime()));
                 }
             }
         };
-        MAIN.postDelayed(expiry, 1_000L);
+        MAIN.postDelayed(expiry, LIMIT_MS);
+        AutoPairService.refreshConnected();
         AutoPairService connected = service.get();
         if (connected != null) connected.scheduleLaunch(token);
     }
@@ -74,6 +76,7 @@ public final class PairingSession {
         if (!armed) return;
         boolean cancelIo = pairing;
         armed = false;
+        WifiApprovalSession.end();
         pairing = false;
         ++generation;
         if (expiry != null) MAIN.removeCallbacks(expiry);
@@ -137,6 +140,7 @@ public final class PairingSession {
         }
         boolean cancelIo = pairing && !success;
         armed = false;
+        WifiApprovalSession.end();
         pairing = false;
         if (expiry != null) MAIN.removeCallbacks(expiry);
         write(state, message, success);
@@ -167,8 +171,9 @@ public final class PairingSession {
                     synchronized (PairingSession.class) {
                         if (token != generation || armed || service.get() != connected) return;
                     }
-                    Log.i(TAG, "DISABLE_COMPLETED_HELPER");
-                    connected.disableSelf();
+                    Log.i(TAG, "IDLE_COMPLETED_HELPER");
+                    connected.updateWorkState();
+                    RecoveryScheduler.schedule(context);
                 }, 500);
             }
         });

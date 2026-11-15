@@ -23,6 +23,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Switch;
 import org.json.JSONObject;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,6 +47,10 @@ public final class MainActivity extends Activity {
     private Button settingsToggle;
     private Button autoPairButton;
     private EditText connectPort;
+    private Switch recoverySwitch;
+    private final Runnable autoClose = () -> {
+        if (!this.destroyed && this.resumed && !this.busy && !pairingActive()) finishAndRemoveTask();
+    };
     private boolean busy;
     private boolean manualPairing;
     private boolean resumed;
@@ -57,6 +62,11 @@ public final class MainActivity extends Activity {
         if (!destroyed) { updateConnection(); refreshIfNeeded(); }
     };
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (prefs, key) -> {
+        if ("restore_update".equals(key)) handler.post(() -> {
+            if (destroyed || busy || pairingActive()) return;
+            if (preferences.getBoolean("restore_ok", false) && RecoveryScheduler.recentlyVerified(this)) renderRecovered();
+            else showUnknown(preferences.getString("restore_message", "等待 Wi-Fi 自动恢复。"));
+        });
         if (key != null && (key.startsWith("pair_") || "paired".equals(key))) {
             handler.removeCallbacks(pairingUpdate);
             handler.post(pairingUpdate);
@@ -103,7 +113,7 @@ public final class MainActivity extends Activity {
         primaryButton(actions, "停止", v -> runAction("stop"));
         primaryButton(actions, "刷新", v -> runAction("status"));
         operations.add(button(panel, "关闭控制界面", v -> closeControlInterface()));
-        TextView exitHint = text(panel, "关闭界面不停止 1.0；USB 调试已开启时，会先关闭无线调试并保留 USB 调试，不必插线。手机重启后需连接 Wi-Fi，再点启动。", 14);
+        TextView exitHint = text(panel, "关闭界面不停止 1.0；USB 调试已开启时，会先关闭无线调试并保留 USB 调试，不必插线。手机重启并首次解锁后，连接 Wi-Fi 可自动恢复；晚些联网也可以。", 14);
         exitHint.setTextColor(Color.DKGRAY);
         exitHint.setPadding(0, dp(4), 0, dp(16));
         settingsToggle = button(panel, "配对与设置  ▾", v -> setSettingsExpanded(settingsPanel.getVisibility() != View.VISIBLE));
@@ -122,13 +132,27 @@ public final class MainActivity extends Activity {
         operations.add(button(settingsPanel, "打开无线调试", v -> {
             if (!SettingsNavigation.openWireless(this)) showSettingsHint();
         }));
+        recoverySwitch = new Switch(this);
+        recoverySwitch.setText("开机和 Wi-Fi 联网后自动恢复");
+        recoverySwitch.setChecked(RecoveryScheduler.enabled(this));
+        settingsPanel.addView(recoverySwitch);
+        recoverySwitch.setOnCheckedChangeListener((view, enabled) -> {
+            handler.removeCallbacks(autoClose);
+            RecoveryScheduler.setEnabled(this, enabled);
+            updateConnection();
+        });
+        operations.add(button(settingsPanel, "开启／检查自动恢复助手", v -> {
+            try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
+            catch (ActivityNotFoundException | SecurityException unavailable) { showSettingsHint(); }
+        }));
+        text(settingsPanel, "自动恢复需保留“双击相机：自动恢复助手”的无障碍开关，并在系统中允许本应用自启动。助手待机时不读取窗口；需要时只点网络授权的“允许”，不勾“始终允许”。重启后首次解锁，再连 Wi-Fi 即可恢复。", 14);
         permissionStatus = text(settingsPanel, "", 14);
         connectPort = new EditText(this);
         connectPort.setInputType(InputType.TYPE_CLASS_NUMBER);
         connectPort.setSingleLine(true);
         connectPort.setHint("连接端口（通常留空，自动发现）");
         settingsPanel.addView(connectPort);
-        text(settingsPanel, "自动发现失败时，填写无线调试主页面的连接端口。此处不是配对码窗口的端口。\n\n点击启动时，应用会开启并保留“USB 调试”，让关闭 Wi-Fi 后的 1.0 继续运行，不必插线。停止和刷新不会修改此开关。\n\n配对助手只用于首次配置，成功后自行关闭；日常双击由 1.0 独立运行。", 14);
+        text(settingsPanel, "自动发现失败时，填写无线调试主页面的连接端口。此处不是配对码窗口的端口。\n\n点击启动时，应用会开启并保留“USB 调试”，让关闭 Wi-Fi 后的 1.0 继续运行，不必插线。停止和刷新不会修改此开关。\n\n助手只在配对或网络授权时读取系统窗口，其他时间待机；日常双击由 1.0 独立运行。", 14);
         detail = text(settingsPanel, "尚无运行记录。", 13);
         detail.setTextIsSelectable(true);
         detail.setVisibility(View.GONE);
@@ -165,7 +189,7 @@ public final class MainActivity extends Activity {
     private void showAutoPairing() {
         if (busy || pairingActive()) return;
         new AlertDialog.Builder(this).setTitle("自动完成首次配对")
-                .setMessage("首次需要在无障碍设置中开启“双击相机：首次配对助手”。助手会跳转无线调试；请您开启无线调试，并确认系统询问的网络授权。\n\n之后自动打开配对码窗口、完成配对，无需分屏或填写端口。成功后助手自行关闭。它不拦截任何按键。")
+                .setMessage("首次需要在无障碍设置中开启“双击相机：自动恢复助手”。助手会跳转无线调试；请您开启无线调试，助手会尝试仅允许本次网络调试。\n\n之后自动打开配对码窗口、完成配对，无需分屏或填写端口。完成后助手回到待机，不拦截按键，不持续扫描窗口。")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始", (dialog, which) -> {
                     PairingSession.begin(getApplicationContext());
@@ -173,7 +197,7 @@ public final class MainActivity extends Activity {
                     if (!PairingSession.isServiceConnected()) {
                         try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
                         catch (ActivityNotFoundException | SecurityException unavailable) {
-                            pairingMessage.setText("请在系统无障碍设置中开启“双击相机：首次配对助手”。");
+                            pairingMessage.setText("请在系统无障碍设置中开启“双击相机：自动恢复助手”。");
                         }
                     }
                 }).show();
@@ -246,30 +270,14 @@ public final class MainActivity extends Activity {
         setBusy(true);
         worker.execute(() -> {
             try {
-                DebuggingExitPolicy.prepareToClose(new DebuggingExitPolicy.SettingsAccess() {
-                    @Override public int readUsb() {
-                        return Settings.Global.getInt(getContentResolver(), Settings.Global.ADB_ENABLED, -1);
-                    }
-                    @Override public int readWireless() {
-                        return Settings.Global.getInt(getContentResolver(), "adb_wifi_enabled", -1);
-                    }
-                    @Override public boolean disableWireless() {
-                        return Settings.Global.putInt(getContentResolver(), "adb_wifi_enabled", 0);
-                    }
-                    @Override public void waitForChange() throws InterruptedException {
-                        Thread.sleep(250);
-                    }
-                });
-                // Readback uses Settings directly: disabling wireless ADB may close its connection.
+                ControllerRuntime.closeInterface(getApplicationContext());
                 handler.post(() -> { if (!destroyed) finishAndRemoveTask(); });
             } catch (Exception error) {
-                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
-                Log.w(TAG, "Could not prepare debugging settings for UI exit", error);
                 handler.post(() -> {
                     if (destroyed) return;
                     setBusy(false);
                     new AlertDialog.Builder(this).setTitle("无线调试未确认关闭")
-                            .setMessage("控制界面保持打开。请确认“USB 调试”已开启，并在开发者选项中手动关闭“无线调试”，然后重试。监听器未被停止。")
+                            .setMessage("界面保持打开。请确认 USB 调试已开启，手动关闭无线调试后重试。监听器未被停止。")
                             .setPositiveButton("知道了", null).show();
                 });
             }
@@ -278,93 +286,34 @@ public final class MainActivity extends Activity {
 
     private void runAction(String action) {
         if (busy || pairingActive()) return;
+        handler.removeCallbacks(autoClose);
         if (!preferences.getBoolean("paired", false)) { showAutoPairing(); return; }
         final int port;
         try { port = parsePort(connectPort.getText().toString(), true); }
         catch (IllegalArgumentException error) { setSettingsExpanded(true); connectPort.setError("连接端口应为 1–65535，也可以留空"); return; }
+        RecoveryScheduler.manualAction(this, action);
         checkedThisResume = true;
         checkedPairUpdate = preferences.getLong("pair_update", 0);
         setBusy(true);
-        showUnknown("start".equals(action) ? "正在连接并启动 1.0…" : "stop".equals(action) ? "正在连接并停止 1.0…" : "正在查询运行状态…");
+        showUnknown("start".equals(action) ? "正在连接并启动 1.0…" : "stop".equals(action) ? "正在停止 1.0…" : "正在查询状态…");
         worker.execute(() -> {
             try {
-                LocalAdbManager adb = getManager();
-                if (!adb.isConnected()) {
-                    if (checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED)
-                        Settings.Global.putInt(getContentResolver(), "adb_wifi_enabled", 1);
-                    if (!adb.connectLocal(port)) throw new IOException("No local wireless debugging connection found");
-                }
-                AdbShell shell = new AdbShell(adb);
-                DeviceController.Result identity = shell.run("id -u", 6);
-                if (identity.exitCode != 0 || !"2000".equals(identity.output.trim())) throw new IOException("The ADB connection is not shell UID 2000");
-                if (checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
-                    DeviceController.Result permission = shell.run("pm grant local.vivodoubleclick.controller android.permission.WRITE_SECURE_SETTINGS", 8);
-                    if (permission.exitCode != 0) Log.w(TAG, "Automatic wireless-debugging permission was not granted");
-                }
-                // Only an explicit Start may change USB debugging, after confirming shell UID 2000.
-                if ("start".equals(action)) ensureUsbDebugging(shell);
-                DeviceController controller = new DeviceController(getApplicationContext(), shell);
-                JSONObject result = "start".equals(action) ? controller.start() : "stop".equals(action) ? controller.stop() : controller.status();
-                Log.i(TAG, "RESULT " + result);
+                JSONObject result = ControllerRuntime.execute(getApplicationContext(), action, port, () -> {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Controller action interrupted");
+                });
+                if (result.optBoolean("ok") && "RUNNING".equals(result.optString("state"))) RecoveryScheduler.success(this);
                 handler.post(() -> { if (!destroyed) render(result); });
             } catch (Exception error) {
-                try { if (manager != null) manager.disconnect(); } catch (IOException ignored) { }
-                reportError(error instanceof UsbDebuggingException ? error.getMessage()
-                        : "操作未完成。请确认 Wi-Fi 已连接、无线调试已开启。自动发现失败时可填写主页面的连接端口。", error);
+                reportError("操作未完成，未自动关闭界面。请检查 Wi-Fi、恢复助手及调试授权；监听器可能仍在运行。", error);
             }
         });
     }
 
-    private void ensureUsbDebugging(AdbShell shell) throws UsbDebuggingException {
+    private void renderRecovered() {
         try {
-            if (readUsbDebugging(shell)) return;
-            if (checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
-                boolean accepted = false;
-                try { accepted = Settings.Global.putInt(getContentResolver(), Settings.Global.ADB_ENABLED, 1); }
-                catch (SecurityException denied) { Log.w(TAG, "USB debugging setting write was denied"); }
-                if (!accepted) Log.w(TAG, "USB debugging setting write was not accepted");
-                // A successful setter is not sufficient: the framework observer can revert the value.
-                if (awaitUsbDebugging(shell)) return;
-            }
-            // Avoid writing again if a delayed observer or the user has already enabled it.
-            if (readUsbDebugging(shell)) return;
-            DeviceController.Result setting = shell.run("settings put global adb_enabled 1", 6);
-            if (setting.exitCode != 0) throw new IOException("USB debugging shell setting was rejected");
-            if (!awaitUsbDebugging(shell)) throw new IOException("USB debugging did not remain enabled after readback");
-        } catch (Exception failure) {
-            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new UsbDebuggingException(failure);
-        }
-    }
-
-    private boolean readUsbDebugging(AdbShell shell) throws Exception {
-        try {
-            int enabled = Settings.Global.getInt(getContentResolver(), Settings.Global.ADB_ENABLED, -1);
-            if (enabled == 0 || enabled == 1) return enabled == 1;
-        } catch (SecurityException denied) {
-            // Some firmware restricts the app-side read; the already verified shell can read it.
-        }
-        DeviceController.Result setting = shell.run("settings get global adb_enabled", 4);
-        String value = setting.output.trim();
-        if (setting.exitCode != 0 || !("0".equals(value) || "1".equals(value)))
-            throw new IOException("Could not read the USB debugging setting");
-        return "1".equals(value);
-    }
-
-    private boolean awaitUsbDebugging(AdbShell shell) throws Exception {
-        int confirmed = 0;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            Thread.sleep(250);
-            confirmed = readUsbDebugging(shell) ? confirmed + 1 : 0;
-            if (confirmed == 2) return true;
-        }
-        return false;
-    }
-
-    private static final class UsbDebuggingException extends IOException {
-        UsbDebuggingException(Exception cause) {
-            super("本次启动未执行：无法确认“USB 调试”已开启。请在开发者选项中手动开启“USB 调试”，不必插线，然后返回重试。现有监听状态尚未确认。", cause);
-        }
+            render(new JSONObject().put("ok", true).put("state", "RUNNING")
+                    .put("message", "已确认运行，无线调试已关闭，USB 调试保留。").put("log", ""));
+        } catch (org.json.JSONException impossible) { throw new IllegalStateException(impossible); }
     }
 
     private void render(JSONObject result) {
@@ -382,6 +331,11 @@ public final class MainActivity extends Activity {
         } else showUnknown("暂时无法确认监听状态。请检查 Wi-Fi 和无线调试，再刷新。");
         detail.setText(result.optString("message") + "\n\n" + result.optString("log"));
         if (!result.optBoolean("ok")) detail.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(autoClose);
+        if (ControllerFlow.shouldClose(result.optBoolean("ok"), running)) {
+            stateMessage.setText("运行正常；无线调试已关闭，USB 调试保留。1 秒后关闭控制界面。");
+            handler.postDelayed(autoClose, ControllerFlow.CLOSE_DELAY_MS);
+        }
     }
 
     private void showUnknown(String message) {
@@ -401,11 +355,12 @@ public final class MainActivity extends Activity {
     }
 
     private boolean pairingActive() { return manualPairing || PairingSession.isActive(); }
-    private void setBusy(boolean value) { busy = value; updateControls(); }
+    private void setBusy(boolean value) { if (value) handler.removeCallbacks(autoClose); busy = value; updateControls(); }
     private void updateControls() {
         boolean enabled = !busy && !pairingActive();
         for (Button button : operations) button.setEnabled(enabled);
         if (connectPort != null) connectPort.setEnabled(enabled);
+        if (recoverySwitch != null) recoverySwitch.setEnabled(enabled);
     }
     private void updateConnection() {
         boolean paired = preferences.getBoolean("paired", false);
@@ -424,11 +379,25 @@ public final class MainActivity extends Activity {
         }
         autoPairButton.setText(paired ? "重新配对（通常无需）" : "首次自动配对");
         boolean automatic = checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED;
-        permissionStatus.setText(automatic ? "无线调试启动权限已就绪。" : "首次连接前，请手动开启无线调试。");
+        permissionStatus.setText(automatic ? (RecoveryScheduler.assistantEnabled(this) ? "自动恢复授权已就绪。" : "调试权限已就绪，请开启自动恢复助手。") : "首次连接前，请手动开启无线调试。");
         updateControls();
     }
     private void refreshIfNeeded() {
         if (!resumed || destroyed || busy || pairingActive() || !preferences.getBoolean("paired", false)) return;
+        if (RecoveryScheduler.enabled(this) && !RecoveryScheduler.assistantEnabled(this)) {
+            setSettingsExpanded(true);
+            showUnknown("请先开启自动恢复助手，并允许本应用自启动；助手待机时不读取窗口。");
+            return;
+        }
+        if (RecoveryScheduler.recentlyVerified(this) && preferences.getBoolean("restore_ok", false)) {
+            renderRecovered();
+            return;
+        }
+        if (RecoveryScheduler.needed(this)) {
+            RecoveryScheduler.schedule(this);
+            showUnknown(preferences.getString("restore_message", "等待 Wi-Fi 自动恢复。"));
+            return;
+        }
         long update = preferences.getLong("pair_update", 0);
         boolean newSuccess = "success".equals(preferences.getString("pair_status", "")) && update != checkedPairUpdate;
         if (checkedThisResume && !newSuccess) return;
@@ -446,6 +415,7 @@ public final class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        RecoveryScheduler.onUserPresent(this);
         checkedThisResume = false;
         PairingSession.recoverInterrupted(getApplicationContext());
         if (connection == null) return;
@@ -453,6 +423,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onPause() {
         resumed = false;
+        handler.removeCallbacks(autoClose);
         super.onPause();
     }
     @Override protected void onDestroy() {
