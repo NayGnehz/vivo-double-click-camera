@@ -4,9 +4,9 @@
 
 ## 下载与使用
 
-1.0-standalone.7 使用 R8 裁剪未使用的依赖代码，关闭混淆和代码优化。APK 从 4.41 MB 缩至 1.95 MB（减少 55.7%），原生库、资源和监听核心保持原字节。身份生成与证书校验 16 项断言、退出策略 16 项断言，以及未裁剪/裁剪构建之间的双向身份兼容测试通过；本版尚未真机验收。
+1.0-standalone.8 使用系统 TLS 1.3 与公开 TLS exporter 接口，并精简 RSA 身份 Provider。APK 约 0.45 MB，较原始 4.41 MB 减少约 90%。最低 Android 12（API 31）；X300 / OriginOS 6 满足此要求。保留旧系统支持的 .7 仍可下载。SPAKE2 和监听核心保持原字节。身份生成与证书校验 16 项断言、退出策略 16 项断言，以及未裁剪/裁剪构建之间的双向身份兼容测试通过；本版尚未真机验收。
 
-到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.7.apk`。控制器支持 arm64-v8a，最低 Android 8.1；此前版本只在 X300 / OriginOS 6 上验证，本版退出调试开关改动已通过构建和回归测试，尚未真机验收。
+到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.8.apk`。控制器支持 arm64-v8a，最低 Android 12；此前版本只在 X300 / OriginOS 6 上验证，本版退出调试开关改动已通过构建和回归测试，尚未真机验收。
 
 1. 将系统“双击电源键”设为“无功能”，关闭其他工具的按键拦截。
 2. 安装 APK，连接 Wi-Fi（无需互联网），开启开发者选项。
@@ -45,7 +45,7 @@ Release 的 `VivoCamera-Controller-source-public.zip` 包含与仓库相同的�
 .\Build-Standalone.ps1 -JdkPath 'C:\Tools\jdk-17' -SdkPath 'C:\Android\Sdk' -WorkRoot 'C:\BuildCache\vivo'
 ```
 
-产物在 `<WorkRoot>/dist/`；构建只使用已有依赖，不下载工具。签名使用该工作目录中新生成的开发密钥，无法直接覆盖本 Release 的签名安装包。开发密钥不随源码包分发。最低 API 27，native ABI 为 arm64-v8a。SPAKE2 的修改和重新链接步骤见控制器 `third-party-source/README.md`。
+产物在 `<WorkRoot>/dist/`；构建只使用已有依赖，不下载工具。签名使用该工作目录中新生成的开发密钥，无法直接覆盖本 Release 的签名安装包。开发密钥不随源码包分发。最低 API 31，native ABI 为 arm64-v8a。SPAKE2 的修改和重新链接步骤见控制器 `third-party-source/README.md`。
 
 仓库根 `Build.ps1` / `Build.cmd` 及控制器 `Build-Standalone-Local.ps1` 保留维护者共享 `_env` 构建入口；使用它们需要单独恢复该固定共享环境，不属于独立源码包的必备步骤。
 

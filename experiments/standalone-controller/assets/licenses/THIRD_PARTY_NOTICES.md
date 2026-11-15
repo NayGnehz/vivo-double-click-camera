@@ -1,3 +1,24 @@
+# Packaging update: 1.0-standalone.8
+
+This Android 12+ build uses Android's platform TLS 1.3 implementation and the public
+android.net.ssl.SSLSockets.exportKeyingMaterial API (API 31+). No org.conscrypt JAR or
+libconscrypt_jni.so is distributed in the APK. Historical Conscrypt/BoringSSL license
+texts below are retained as provenance of earlier fixed build inputs.
+
+RSA software key generation/decoding remains provided by the original Bouncy Castle
+RSA key implementations, with an identity-only two-service Provider. Signatures and
+X.509 certificate parsing use standard platform JCA. The persisted identity format,
+SPAKE2 JNI binary, existing listener JAR and remaining dependency versions are unchanged.
+
+The local PairingConnectionCtx patch now uses the public Android 12+ TLS exporter,
+keeping the ADB exporter label, null context and 64-byte output length unchanged.
+
+The dependency inventory below documents the original fixed inputs. Conscrypt/BoringSSL
+are not runtime dependencies of .8; all remaining applicable third-party notices and
+the LGPL SPAKE2 corresponding-source/relinking materials continue to accompany this build.
+
+---
+
 # Third-party notices for the standalone controller
 
 This inventory describes the binary dependencies currently in this project's `libs` directory. License and notice texts are included under `assets/licenses` so they can be distributed inside the APK. Reviewed on 2026-09-17 against the versioned upstream sources and the actual local artifacts. This document does not assign a license to the controller's own code.

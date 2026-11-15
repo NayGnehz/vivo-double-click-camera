@@ -8,7 +8,7 @@ import android.util.AtomicFile;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import java.security.Provider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
@@ -48,7 +48,17 @@ final class IdentityStore {
     private static final int MAX_FILE_BYTES = 64 * 1024;
     private static final int MAX_KEY_BYTES = 16 * 1024;
     private static final int MAX_CERT_BYTES = 32 * 1024;
-    private static final BouncyCastleProvider BC = new BouncyCastleProvider();
+    // Register only the software RSA key implementations used by persisted ADB identities.
+    // Standard platform JCA provides signatures and X.509 parsing; no global provider is installed.
+    private static final Provider IDENTITY_KEYS = new RsaIdentityProvider();
+
+    private static final class RsaIdentityProvider extends Provider {
+        RsaIdentityProvider() {
+            super("VivoIdentityKeys", 1.0, "Software RSA keys for local ADB identity compatibility");
+            put("KeyPairGenerator.RSA", "org.bouncycastle.jcajce.provider.asymmetric.rsa.KeyPairGeneratorSpi");
+            put("KeyFactory.RSA", "org.bouncycastle.jcajce.provider.asymmetric.rsa.KeyFactorySpi");
+        }
+    }
     private static final byte[] VALIDATION_MESSAGE =
             "VivoCameraController ADB identity check v1".getBytes(StandardCharsets.UTF_8);
 
@@ -100,7 +110,7 @@ final class IdentityStore {
 
     private static Identity generate() throws Exception {
         SecureRandom random = new SecureRandom();
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA", BC);
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA", IDENTITY_KEYS);
         generator.initialize(2048, random);
         KeyPair pair = generator.generateKeyPair();
 
@@ -114,9 +124,9 @@ final class IdentityStore {
                 subject, serial, new Date(now - 86_400_000L), expiry.getTime(),
                 subject, pair.getPublic());
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
-                .setProvider(BC).build(pair.getPrivate());
+                .build(pair.getPrivate());
         X509Certificate certificate = new JcaX509CertificateConverter()
-                .setProvider(BC).getCertificate(builder.build(signer));
+                .getCertificate(builder.build(signer));
         Identity identity = new Identity(pair.getPrivate(), certificate);
         validate(identity);
         return identity;
@@ -135,8 +145,8 @@ final class IdentityStore {
             throw new GeneralSecurityException("ADB 私钥与 2048 位 RSA 证书不匹配");
         }
         identity.certificate.checkValidity();
-        identity.certificate.verify(publicKey, BC);
-        Signature signature = Signature.getInstance("SHA256withRSA", BC);
+        identity.certificate.verify(publicKey);
+        Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initSign(identity.privateKey);
         signature.update(VALIDATION_MESSAGE);
         byte[] proof = signature.sign();
@@ -175,11 +185,11 @@ final class IdentityStore {
             try {
                 byte[] certificateBytes = readSized(input, MAX_CERT_BYTES);
                 if (input.read() != -1) throw new IOException("ADB 身份文件含有多余数据");
-                PrivateKey key = KeyFactory.getInstance("RSA", BC)
+                PrivateKey key = KeyFactory.getInstance("RSA", IDENTITY_KEYS)
                         .generatePrivate(new PKCS8EncodedKeySpec(privateBytes));
                 ByteArrayInputStream certificateInput = new ByteArrayInputStream(certificateBytes);
                 X509Certificate certificate = (X509Certificate) CertificateFactory
-                        .getInstance("X.509", BC).generateCertificate(certificateInput);
+                        .getInstance("X.509").generateCertificate(certificateInput);
                 if (certificateInput.available() != 0) {
                     throw new IOException("ADB 证书含有多余数据");
                 }

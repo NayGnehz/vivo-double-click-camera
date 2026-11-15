@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR Apache-2.0
 // Based on libadb-android 3.1.1, commit c849886ebc6d48e7b46d967e78a6bb65c90c3b74.
 // Local changes: bounded socket operations, an overall deadline, cancellation,
-// null-safe cleanup, and removal of peer identity data from logs.
+// null-safe cleanup, removal of peer identity data from logs, and Android 12+ public TLS exporter.
 
 package io.github.muntashirakon.adb;
 
-import android.annotation.SuppressLint;
 import android.os.Build;
 import android.util.Log;
 
@@ -18,7 +17,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -221,7 +219,6 @@ public final class PairingConnectionCtx implements Closeable {
             sslServerSocket.setSoTimeout(CONNECT_TIMEOUT_MS);
             socket = sslServerSocket.accept();
             mSocket = socket;
-            // TODO: Write automated test scripts after removing Conscrypt dependency.
         } else { // role == Role.Client
             socket = new Socket();
             mSocket = socket;
@@ -257,29 +254,15 @@ public final class PairingConnectionCtx implements Closeable {
         this.mPairingAuthCtx = pairingAuthCtx;
     }
 
-    @SuppressLint("PrivateApi") // Conscrypt is a stable private API
+    @RequiresApi(31)
     private byte[] exportKeyingMaterial(SSLSocket sslSocket, int length) throws SSLException {
-        // Conscrypt#exportKeyingMaterial(SSLSocket socket, String label, byte[] context, int length): byte[]
-        //          throws SSLException
-        try {
-            Class<?> conscryptClass;
-            if (SslUtils.isCustomConscrypt()) {
-                conscryptClass = Class.forName("org.conscrypt.Conscrypt");
-            } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                // Although support for conscrypt has been added in Android 5.0 (Lollipop),
-                // TLS1.3 isn't supported until Android 9 (Pie).
-                throw new SSLException("TLSv1.3 isn't supported on your platform. Use custom Conscrypt library instead.");
-            } else {
-                conscryptClass = Class.forName("com.android.org.conscrypt.Conscrypt");
-            }
-            Method exportKeyingMaterial = conscryptClass.getMethod("exportKeyingMaterial", SSLSocket.class,
-                    String.class, byte[].class, int.class);
-            return (byte[]) exportKeyingMaterial.invoke(null, sslSocket, EXPORTED_KEY_LABEL, null, length);
-        } catch (SSLException e) {
-            throw e;
-        } catch (Throwable th) {
-            throw new SSLException(th);
+        // Public API since Android 12; no bundled TLS provider or hidden-API access.
+        byte[] material = android.net.ssl.SSLSockets.exportKeyingMaterial(
+                sslSocket, EXPORTED_KEY_LABEL, null, length);
+        if (material == null || material.length != length) {
+            throw new SSLException("TLS exporter returned no complete key material");
         }
+        return material;
     }
 
     private void writeHeader(@NonNull PairingPacketHeader header, @NonNull byte[] payload) throws IOException {

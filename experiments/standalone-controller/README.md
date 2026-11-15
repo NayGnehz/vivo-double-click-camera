@@ -1,4 +1,4 @@
-# 独立控制器 1.0-standalone.7
+# 独立控制器 1.0-standalone.8（Android 12+）
 
 安装、配对和使用见仓库根 README。独立重建使用本目录 Build-Standalone.ps1，必须显式传入 JdkPath、SdkPath 和 WorkRoot；所需二进制依赖见 Release 的完整源码包。
 

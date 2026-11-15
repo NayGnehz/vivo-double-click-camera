@@ -44,7 +44,7 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     $align=Join-Path $buildTools 'zipalign.exe'
     $d8=Join-Path $buildTools 'lib\d8.jar'
     $signer=Join-Path $buildTools 'lib\apksigner.jar'
-    $names=@('libadb-3.1.1.jar','spake2-2.2.1.jar','conscrypt-2.6.3.jar','bcprov-1.81.jar','bcpkix-1.81.jar','bcutil-1.81.jar','annotation-1.9.1.jar','kotlin-stdlib-2.0.21.jar')
+    $names=@('libadb-3.1.1.jar','spake2-2.2.1.jar','bcprov-1.81.jar','bcpkix-1.81.jar','bcutil-1.81.jar','annotation-1.9.1.jar','kotlin-stdlib-2.0.21.jar')
     $libs=@($names|ForEach-Object {
         $path=Join-Path $fixedRoot ('experiments\standalone-controller\libs\'+$_)
         if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw 'Restore fixed Android dependencies first.'}
@@ -68,6 +68,7 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
         if($asset.Name -ne 'licenses'){Copy-Item -LiteralPath $asset.FullName -Destination $assetRoot -Recurse}
     }
     Copy-Item -LiteralPath (Join-Path $fixedRoot 'experiments\standalone-controller\assets\licenses') -Destination (Join-Path $assetRoot 'licenses') -Recurse
+    Copy-Item -LiteralPath (Join-Path $sourceRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $assetRoot 'licenses\THIRD_PARTY_NOTICES.md') -Force
     # Stage only packaging inputs so native tools never traverse Chinese path segments.
     $packagingInput=Join-Path $buildRoot 'input'
     [void][IO.Directory]::CreateDirectory($packagingInput)
@@ -79,15 +80,20 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     $aligned=Join-Path $buildRoot 'aligned.apk'
     $apk=Join-Path $dist 'vivo-camera-standalone-1.0.apk'
     Invoke-Checked $aapt @('compile','--dir',(Join-Path $packagingInput 'res'),'-o',(Join-Path $buildRoot 'resources.zip'))
-    Invoke-Checked $aapt @('link','-o',$unsignedApk,'--manifest',(Join-Path $packagingInput 'AndroidManifest.xml'),'-I',$packagingAndroidJar,'-A',$assetRoot,(Join-Path $buildRoot 'resources.zip'),'--min-sdk-version','27','--target-sdk-version','36')
+    Invoke-Checked $aapt @('link','-o',$unsignedApk,'--manifest',(Join-Path $packagingInput 'AndroidManifest.xml'),'-I',$packagingAndroidJar,'-A',$assetRoot,(Join-Path $buildRoot 'resources.zip'),'--min-sdk-version','31','--target-sdk-version','36')
     $sources=@((Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'src') -Filter '*.java' -Recurse).FullName)
     Invoke-Checked $javac (@('-encoding','UTF-8','--release','8','-classpath',(($androidJar+';')+($libs -join ';')),'-d',$classes)+$sources)
     $classFiles=@((Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse).FullName)
-    Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','27','--lib',$androidJar,'--pg-conf',(Join-Path $sourceRoot 'shrink-rules.pro'),'--output',$dex)+$classFiles+$libs)
+    Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','31','--lib',$androidJar,'--pg-conf',(Join-Path $sourceRoot 'shrink-rules.pro'),'--output',$dex)+$classFiles+$libs)
     $dexFiles=@(Get-ChildItem -LiteralPath $dex -Filter 'classes*.dex')
     if(-not $dexFiles.Count){throw 'R8 did not produce DEX output.'}
     foreach($item in $dexFiles){Invoke-Checked $jar @('uf',$unsignedApk,'-C',$dex,$item.Name)}
-    Invoke-Checked $jar @('uf',$unsignedApk,'-C',(Join-Path $fixedRoot 'experiments\standalone-controller\native'),'lib')
+    # Only SPAKE2 JNI is needed. TLS comes from Android's platform provider.
+    $nativeInput=Join-Path $buildRoot 'native-input'
+    $nativeAbi=Join-Path $nativeInput 'lib\arm64-v8a'
+    [void][IO.Directory]::CreateDirectory($nativeAbi)
+    Copy-Item -LiteralPath (Join-Path $fixedRoot 'experiments\standalone-controller\native\lib\arm64-v8a\libspake2.so') -Destination $nativeAbi
+    Invoke-Checked $jar @('uf',$unsignedApk,'-C',$nativeInput,'lib')
     Invoke-Checked $align @('-f','-P','16','4',$unsignedApk,$aligned)
     if($Unsigned){
         Copy-Item -LiteralPath $aligned -Destination $apk -Force

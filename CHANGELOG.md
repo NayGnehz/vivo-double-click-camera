@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.0-standalone.8
+
+- 改用 Android 12+ 系统 TLS 与公开 exporter 接口，移除自带 Conscrypt 原生库。精简 RSA 身份 Provider，保持原身份文件格式和 RSA 软件密钥实现。
+- APK 约 0.45 MB；身份/证书 16 项、退出策略 16 项、与 .7 的身份双向兼容及主机 TLS 1.3 双向认证回环测试通过。Android 真机配对待验收。
+
 ## 1.0-standalone.7
 
 - 使用 R8 裁剪未使用的依赖代码；不混淆名称、不进行代码优化，保留配对、TLS、RSA/X.509 的反射和 JNI 入口。

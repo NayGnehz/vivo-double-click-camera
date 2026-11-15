@@ -27,7 +27,7 @@ $dex = Join-Path $buildRoot 'dex'
 $dist = Join-Path $WorkRoot 'dist'
 $keys = Join-Path $WorkRoot 'development-signing'
 New-Item -ItemType Directory -Force -Path $classes,$dex,$dist,$keys | Out-Null
-$names = @('libadb-3.1.1.jar','spake2-2.2.1.jar','conscrypt-2.6.3.jar','bcprov-1.81.jar',
+$names = @('libadb-3.1.1.jar','spake2-2.2.1.jar','bcprov-1.81.jar',
     'bcpkix-1.81.jar','bcutil-1.81.jar','annotation-1.9.1.jar','kotlin-stdlib-2.0.21.jar')
 $libs = @($names | ForEach-Object {
     $p = Join-Path $controllerRoot ('libs\' + $_)
@@ -56,11 +56,11 @@ $apk = Join-Path $dist 'vivo-camera-standalone-1.0.apk'
 Invoke-Checked $aapt @('compile','--dir',(Join-Path $controllerRoot 'res'),'-o',(Join-Path $buildRoot 'resources.zip'))
 Invoke-Checked $aapt @('link','-o',$unsigned,'--manifest',(Join-Path $controllerRoot 'AndroidManifest.xml'),
     '-I',$androidJar,'-A',(Join-Path $controllerRoot 'assets'),(Join-Path $buildRoot 'resources.zip'),
-    '--min-sdk-version','27','--target-sdk-version','36')
+    '--min-sdk-version','31','--target-sdk-version','36')
 $sources = @((Get-ChildItem -LiteralPath (Join-Path $controllerRoot 'src') -Filter '*.java' -Recurse).FullName)
 Invoke-Checked $javac (@('-encoding','UTF-8','--release','8','-classpath',(($androidJar + ';') + ($libs -join ';')),'-d',$classes) + $sources)
 $classFiles = @((Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse).FullName)
-Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','27','--lib',$androidJar,'--pg-conf',(Join-Path $controllerRoot 'shrink-rules.pro'),'--output',$dex) + $classFiles + $libs)
+Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','31','--lib',$androidJar,'--pg-conf',(Join-Path $controllerRoot 'shrink-rules.pro'),'--output',$dex) + $classFiles + $libs)
 $dexFiles = @(Get-ChildItem -LiteralPath $dex -Filter 'classes*.dex')
 if ($dexFiles.Count -eq 0) { throw 'D8 did not produce any DEX files' }
 foreach ($item in $dexFiles) { Invoke-Checked $jar @('uf',$unsigned,'-C',$dex,$item.Name) }
