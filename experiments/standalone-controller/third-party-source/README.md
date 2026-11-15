@@ -61,7 +61,7 @@ This route needs JDK 17, Android SDK platform `android-37.0` (or another compati
 
 ```powershell
 $sdkPath = 'C:\Android\Sdk'
-$jdkPath = 'C:\Tools\jdk-17'
+$jdkPath = 'C:\Tools\jdk-17
 $ndkPath = 'C:\path\to\installed\android-ndk-r28-or-newer'
 $cmakeExe = 'C:\path\to\installed\cmake.exe'
 $ninjaExe = 'C:\path\to\installed\ninja.exe'
@@ -114,14 +114,14 @@ Copy-Item -LiteralPath (Join-Path $controllerRoot 'libs/spake2-2.2.1.jar') -Dest
 Copy-Item -LiteralPath (Join-Path $controllerRoot 'native/lib/arm64-v8a/libspake2.so') -Destination (Join-Path $replacementBackup 'libspake2.so')
 Copy-Item -LiteralPath $replacementJar -Destination (Join-Path $controllerRoot 'libs/spake2-2.2.1.jar') -Force
 Copy-Item -LiteralPath $replacementSo -Destination (Join-Path $controllerRoot 'native/lib/arm64-v8a/libspake2.so') -Force
-& (Join-Path $controllerRoot 'Build-Standalone.ps1') -SdkPath $sdkPath -JdkPath $jdkPath -WorkRoot $sourceWork
+& (Join-Path $controllerRoot 'Build-Standalone.ps1') -SdkPath $sdkPath -JdkPath $jdkPath
 ```
 
-This recompiles all provided controller Java source, processes the replacement SPAKE2 JAR with D8, packages the replacement `.so`, aligns, signs, and verifies `<WorkRoot>/dist/vivo-camera-standalone-1.0.apk`. Preserve/update the notices and modification descriptions when distributing a changed library or APK. The original archive checksums continue to describe the untouched source archives; update any inventory describing changed binary files.
+This recompiles all provided controller Java source, processes the replacement SPAKE2 JAR with D8, packages the replacement `.so`, aligns, signs, and verifies `dist/vivo-camera-standalone-1.0.apk`. Preserve/update the notices and modification descriptions when distributing a changed library or APK. The original archive checksums continue to describe the untouched source archives; update any inventory describing changed binary files.
 
 ## Installing a relinked build
 
-Use Android's ordinary package installer, or your own authorized ADB connection with `adb install -r dist/vivo-camera-standalone-1.0.apk`. An in-place update needs the same app-signing key. The supplied build script uses `<WorkRoot>/development-signing/controller.keystore`, creating a local key if absent; this signing key is unrelated to the phone's wireless ADB pairing identity. A build signed with your own different key requires uninstalling the previous package before installing it, which removes that application's private pairing state and requires pairing/permission setup again. Do not uninstall merely to test rebuilding.
+Use Android's ordinary package installer, or your own authorized ADB connection with `adb install -r dist/vivo-camera-standalone-1.0.apk`. An in-place update needs the same app-signing key. The supplied build script uses `keys/controller.keystore`, creating a local key if absent; this signing key is unrelated to the phone's wireless ADB pairing identity. A build signed with your own different key requires uninstalling the previous package before installing it, which removes that application's private pairing state and requires pairing/permission setup again. Do not uninstall merely to test rebuilding.
 
 The application has no library integrity check that rejects a modified, compatible SPAKE2 library. Android still enforces normal APK signing, native ABI, and app installation rules. These instructions do not require disabling device security or changing the native listener's behavior.
 

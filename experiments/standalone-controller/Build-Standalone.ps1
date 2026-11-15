@@ -55,7 +55,7 @@ Copy-Item -LiteralPath (Join-Path $controllerRoot 'assets') -Destination $assetR
 $licensePacking = & (Join-Path $controllerRoot 'Pack-LicenseAssets.ps1') -StagingLicenseDirectory (Join-Path $assetRoot 'licenses')
 $unsigned = Join-Path $buildRoot 'unsigned.apk'
 $aligned = Join-Path $buildRoot 'aligned.apk'
-$apk = Join-Path $dist 'vivo-camera-standalone-1.0.apk'
+$apk = Join-Path $dist 'vivo-camera-standalone-2.0.apk'
 Invoke-Checked $aapt @('compile','--dir',(Join-Path $controllerRoot 'res'),'-o',(Join-Path $buildRoot 'resources.zip'))
 Invoke-Checked $aapt @('link','-o',$unsigned,'--manifest',(Join-Path $controllerRoot 'AndroidManifest.xml'),
     '-I',$androidJar,'-A',$assetRoot,(Join-Path $buildRoot 'resources.zip'),

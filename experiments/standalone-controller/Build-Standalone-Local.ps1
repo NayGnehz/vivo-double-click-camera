@@ -67,6 +67,12 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     foreach($asset in Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'assets') -Force){
         if($asset.Name -ne 'licenses'){Copy-Item -LiteralPath $asset.FullName -Destination $assetRoot -Recurse}
     }
+    $coreJar=Join-Path $context.releaseRoot 'core-v1.0\dist\vivo-camera.jar'
+    if(-not(Test-Path -LiteralPath $coreJar -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $coreJar -Algorithm SHA256).Hash.ToLowerInvariant() -cne '6eca8617ccaf7236de286b55489e0bf9faeb0648e619c32afdca6ba8b3090f51') {
+        throw 'Restore the accepted core-v1.0 release before building the controller.'
+    }
+    Copy-Item -LiteralPath $coreJar -Destination (Join-Path $assetRoot 'vivo-camera.jar')
     Copy-Item -LiteralPath (Join-Path $fixedRoot 'experiments\standalone-controller\assets\licenses') -Destination (Join-Path $assetRoot 'licenses') -Recurse
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $assetRoot 'licenses\THIRD_PARTY_NOTICES.md') -Force
     $licensePacking = & (Join-Path $sourceRoot 'Pack-LicenseAssets.ps1') -StagingLicenseDirectory (Join-Path $assetRoot 'licenses')
@@ -79,7 +85,7 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     Copy-Item -LiteralPath $androidJar -Destination $packagingAndroidJar
     $unsignedApk=Join-Path $buildRoot 'unsigned.apk'
     $aligned=Join-Path $buildRoot 'aligned.apk'
-    $apk=Join-Path $dist 'vivo-camera-standalone-1.0.apk'
+    $apk=Join-Path $dist 'vivo-camera-standalone-2.0.apk'
     Invoke-Checked $aapt @('compile','--dir',(Join-Path $packagingInput 'res'),'-o',(Join-Path $buildRoot 'resources.zip'))
     Invoke-Checked $aapt @('link','-o',$unsignedApk,'--manifest',(Join-Path $packagingInput 'AndroidManifest.xml'),'-I',$packagingAndroidJar,'-A',$assetRoot,(Join-Path $buildRoot 'resources.zip'),'--min-sdk-version','31','--target-sdk-version','36')
     $sources=@((Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'src') -Filter '*.java' -Recurse).FullName)

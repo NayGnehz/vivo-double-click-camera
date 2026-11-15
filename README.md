@@ -1,5 +1,7 @@
 # vivo 双击电源键打开相机
 
+2.0 正式版采用用户已接受的 1.0-standalone.13 功能基线。本次仅更新版本元数据与便携目录入口，不更改配对、授权、自动恢复或按键监听行为。
+
 无需 root，适用于 vivo X300 / OriginOS 6（Android 16）。最低 Android 12，arm64-v8a。
 
 ## 本版修复
@@ -8,7 +10,7 @@
 
 ## 下载与使用
 
-在 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.13.apk`。APK 约 0.45 MB，使用原签名，可覆盖升级并保留配对。
+在 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-2.0.apk`。APK 约 0.45 MB，使用原签名，可覆盖升级并保留配对。
 
 1. 将系统“双击电源键”设置为“无功能”，关闭其他按键拦截。
 2. 首次使用连接 Wi-Fi、开启开发者选项，在 App 的“设置 → 首次配对”按提示完成本机配对。
