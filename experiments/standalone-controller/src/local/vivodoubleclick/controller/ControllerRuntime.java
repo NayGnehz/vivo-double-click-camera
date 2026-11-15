@@ -34,23 +34,19 @@ final class ControllerRuntime {
             this.context = context; this.port = port; this.cancellation = cancellation;
         }
         public void connect() throws Exception {
-            manager = new LocalAdbManager(context);
+            // Arm the already-bound helper before loading/verifying the saved RSA
+            // identity. A boot/network dialog may already be visible at this point.
             WifiApprovalSession.begin(90_000L);
+            manager = new LocalAdbManager(context);
             if (DebuggingSettings.canWrite(context)) {
                 openedWireless = DebuggingSettings.wireless(context) != 1;
-                if (!Settings.Global.putInt(context.getContentResolver(), "adb_wifi_enabled", 1))
+                if (openedWireless && !Settings.Global.putInt(context.getContentResolver(), "adb_wifi_enabled", 1))
                     throw new IOException("Wireless debugging write rejected");
             }
             // A network-confirmation dialog can precede mDNS publication. Retry discovery
             // only within this short operation, never as an idle background polling loop.
-            boolean connected = false;
-            for (int attempt = 0; attempt < 3 && !connected; attempt++) {
-                cancellation.check();
-                try { connected = manager.connectLocal(port); }
-                catch (InterruptedException cancelled) { throw cancelled; }
-                catch (Exception failure) { if (attempt == 2) throw failure; }
-                if (!connected && attempt < 2) { cancellation.check(); Thread.sleep(1_000L); }
-            }
+            boolean connected = AdbConnectionRetry.connect(() -> manager.connectLocal(port),
+                    cancellation, () -> Thread.sleep(1_000L));
             if (!connected) throw new IOException("No local wireless debugging connection");
             shell = new AdbShell(manager);
             DeviceController.Result identity = shell.run("id -u", 6);

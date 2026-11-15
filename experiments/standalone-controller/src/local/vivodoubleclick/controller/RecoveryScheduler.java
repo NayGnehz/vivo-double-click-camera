@@ -97,9 +97,11 @@ final class RecoveryScheduler {
                 .putString("restore_message", RecoveryPolicy.phaseMessage(phase))
                 .putLong("restore_update", SystemClock.elapsedRealtime()).apply();
     }
-    static void failed(Context context) {
+    static void failed(Context context, Exception failure) {
         prefs(context).edit().putBoolean("restore_ok", false)
-                .putString("restore_message", "自动启动未完成：" + RecoveryPolicy.phaseFailure(prefs(context).getString("restore_phase", "connect")) + " 本次联网最多尝试三次。")
+                .putString("restore_message", "自动启动未完成：" + (failure instanceof AdbConnectionRetry.DiscoveryTimeout
+                        ? "本机调试端口发现超时，连接重试已用尽。" : RecoveryPolicy.phaseFailure(prefs(context).getString("restore_phase", "connect")))
+                        + " 本次联网最多尝试三次。")
                 .putLong("restore_update", SystemClock.elapsedRealtime()).apply();
     }
     static void waitForUnlock(Context context) { prefs(context).edit().putBoolean("restore_wait_unlock", true).apply(); }

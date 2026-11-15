@@ -39,7 +39,7 @@ final class AutomaticRecovery {
             return false;
         } catch (Exception failure) {
             if (ticket.cancelled()) return false;
-            RecoveryScheduler.failed(context);
+            RecoveryScheduler.failed(context, failure);
             if (locked(context)) { RecoveryScheduler.waitForUnlock(context); return false; }
             return RecoveryScheduler.mayRetry(context);
         } finally {
