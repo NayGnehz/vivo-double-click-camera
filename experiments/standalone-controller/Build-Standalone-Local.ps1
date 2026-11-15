@@ -83,9 +83,9 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     $sources=@((Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'src') -Filter '*.java' -Recurse).FullName)
     Invoke-Checked $javac (@('-encoding','UTF-8','--release','8','-classpath',(($androidJar+';')+($libs -join ';')),'-d',$classes)+$sources)
     $classFiles=@((Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse).FullName)
-    Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.D8','--min-api','27','--lib',$androidJar,'--output',$dex)+$classFiles+$libs)
+    Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','27','--lib',$androidJar,'--pg-conf',(Join-Path $sourceRoot 'shrink-rules.pro'),'--output',$dex)+$classFiles+$libs)
     $dexFiles=@(Get-ChildItem -LiteralPath $dex -Filter 'classes*.dex')
-    if(-not $dexFiles.Count){throw 'D8 did not produce DEX output.'}
+    if(-not $dexFiles.Count){throw 'R8 did not produce DEX output.'}
     foreach($item in $dexFiles){Invoke-Checked $jar @('uf',$unsignedApk,'-C',$dex,$item.Name)}
     Invoke-Checked $jar @('uf',$unsignedApk,'-C',(Join-Path $fixedRoot 'experiments\standalone-controller\native'),'lib')
     Invoke-Checked $align @('-f','-P','16','4',$unsignedApk,$aligned)

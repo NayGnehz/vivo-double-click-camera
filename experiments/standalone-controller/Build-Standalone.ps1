@@ -60,7 +60,7 @@ Invoke-Checked $aapt @('link','-o',$unsigned,'--manifest',(Join-Path $controller
 $sources = @((Get-ChildItem -LiteralPath (Join-Path $controllerRoot 'src') -Filter '*.java' -Recurse).FullName)
 Invoke-Checked $javac (@('-encoding','UTF-8','--release','8','-classpath',(($androidJar + ';') + ($libs -join ';')),'-d',$classes) + $sources)
 $classFiles = @((Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse).FullName)
-Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.D8','--min-api','27','--lib',$androidJar,'--output',$dex) + $classFiles + $libs)
+Invoke-Checked $java (@('-cp',$d8,'com.android.tools.r8.R8','--release','--min-api','27','--lib',$androidJar,'--pg-conf',(Join-Path $controllerRoot 'shrink-rules.pro'),'--output',$dex) + $classFiles + $libs)
 $dexFiles = @(Get-ChildItem -LiteralPath $dex -Filter 'classes*.dex')
 if ($dexFiles.Count -eq 0) { throw 'D8 did not produce any DEX files' }
 foreach ($item in $dexFiles) { Invoke-Checked $jar @('uf',$unsigned,'-C',$dex,$item.Name) }

@@ -4,7 +4,9 @@
 
 ## 下载与使用
 
-到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.6.apk`。控制器支持 arm64-v8a，最低 Android 8.1；此前版本只在 X300 / OriginOS 6 上验证，本版退出调试开关改动已通过构建和回归测试，尚未真机验收。
+1.0-standalone.7 使用 R8 裁剪未使用的依赖代码，关闭混淆和代码优化。APK 从 4.41 MB 缩至 1.95 MB（减少 55.7%），原生库、资源和监听核心保持原字节。身份生成与证书校验 16 项断言、退出策略 16 项断言，以及未裁剪/裁剪构建之间的双向身份兼容测试通过；本版尚未真机验收。
+
+到 [Releases](../../releases/latest) 下载 `VivoCamera-Controller-1.0-standalone.7.apk`。控制器支持 arm64-v8a，最低 Android 8.1；此前版本只在 X300 / OriginOS 6 上验证，本版退出调试开关改动已通过构建和回归测试，尚未真机验收。
 
 1. 将系统“双击电源键”设为“无功能”，关闭其他工具的按键拦截。
 2. 安装 APK，连接 Wi-Fi（无需互联网），开启开发者选项。
