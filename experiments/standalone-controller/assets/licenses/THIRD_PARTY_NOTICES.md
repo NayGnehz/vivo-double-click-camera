@@ -1,3 +1,19 @@
+# License asset packaging update
+
+The APK may consolidate byte-for-byte identical full license texts. Each original
+asset name is retained: duplicate copies become short references to a complete,
+verbatim text in the same `assets/licenses/` directory. No unique copyright,
+attribution, NOTICE, or license clause is removed. `PACKAGED_LICENSE_MAP.json`
+maps every original name and SHA-256 to its full text and records packaged hashes.
+
+The original downloaded license assets and `LICENSE_SOURCES.json` remain unchanged
+in the source bundle and fixed inputs. This transformation applies only to build
+staging. It does not remove historical Conscrypt/BoringSSL provenance or any LGPL
+source/relinking materials. Independent and local builds use the same
+`Pack-LicenseAssets.ps1` step.
+
+---
+
 # Packaging update: 1.0-standalone.8
 
 This Android 12+ build uses Android's platform TLS 1.3 implementation and the public

@@ -69,6 +69,7 @@ Invoke-VivoPortableBuild -InstanceId $InstanceId -Body ({
     }
     Copy-Item -LiteralPath (Join-Path $fixedRoot 'experiments\standalone-controller\assets\licenses') -Destination (Join-Path $assetRoot 'licenses') -Recurse
     Copy-Item -LiteralPath (Join-Path $sourceRoot 'THIRD_PARTY_NOTICES.md') -Destination (Join-Path $assetRoot 'licenses\THIRD_PARTY_NOTICES.md') -Force
+    $licensePacking = & (Join-Path $sourceRoot 'Pack-LicenseAssets.ps1') -StagingLicenseDirectory (Join-Path $assetRoot 'licenses')
     # Stage only packaging inputs so native tools never traverse Chinese path segments.
     $packagingInput=Join-Path $buildRoot 'input'
     [void][IO.Directory]::CreateDirectory($packagingInput)

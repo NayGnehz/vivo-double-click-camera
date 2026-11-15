@@ -1,6 +1,5 @@
-# Shrink unused library code only. Keep names and bytecode behavior stable.
+# Shrink and optimize dependency code. Preserve names, app/ADB entry points and JNI boundaries.
 -dontobfuscate
--dontoptimize
 -keepattributes Signature,Exceptions,InnerClasses,EnclosingMethod,*Annotation*
 
 # Android manifest entry points, UI callbacks, and identity compatibility.

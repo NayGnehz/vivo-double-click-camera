@@ -32,6 +32,11 @@ public final class AutoPairService extends AccessibilityService {
     private static final Pattern ADDRESS = Pattern.compile(
             "^(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3}|\\[[0-9a-fA-F:.%]+\\]):([0-9]{1,5})$");
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final WindowScanSchedule eventScans = new WindowScanSchedule();
+    private final Runnable eventScanTask = () -> {
+        eventScans.started(SystemClock.elapsedRealtime());
+        scan();
+    };
     private long launchedToken;
     private long clickedToken;
     private long lastScan;
@@ -59,7 +64,7 @@ public final class AutoPairService extends AccessibilityService {
         @Override public void onReceive(Context context, Intent intent) {
             RecoveryScheduler.onUserPresent(context);
             if (recovery != null) recovery.request();
-            if (WifiApprovalSession.active()) main.post(scanTask);
+            if (WifiApprovalSession.active()) requestEventScan();
         }
     };
     static void refreshConnected() {
@@ -78,7 +83,9 @@ public final class AutoPairService extends AccessibilityService {
                 info.eventTypes = events;
                 info.packageNames = new String[]{SETTINGS, "com.android.systemui"};
                 info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
-                info.notificationTimeout = 150;
+                // A live authorization window should not wait for a quiet event stream.
+                // Coalesce our own scans instead; idle stays subscribed only minimally.
+                info.notificationTimeout = working ? 0 : 150;
                 setServiceInfo(info);
                 configuredEvents = events;
             }
@@ -92,8 +99,12 @@ public final class AutoPairService extends AccessibilityService {
             connectivity.unregisterNetworkCallback(networkCallback);
             networkRegistered = false;
         }
-        main.removeCallbacks(scanTask);
-        if (PairingSession.isActive() || WifiApprovalSession.active()) main.post(scanTask);
+        if (working) requestEventScan();
+        else {
+            main.removeCallbacks(eventScanTask);
+            main.removeCallbacks(scanTask);
+            eventScans.reset();
+        }
     }
     private Resources settingsResources;
     private final Runnable scanTask = this::scan;
@@ -138,8 +149,13 @@ public final class AutoPairService extends AccessibilityService {
         String owner = event.getPackageName() == null ? "" : event.getPackageName().toString();
         if (!(PairingSession.isActive() && SETTINGS.equals(owner))
                 && !(WifiApprovalSession.active() && WifiApprovalUi.packageAllowed(owner))) return;
-        main.removeCallbacks(scanTask);
-        main.postDelayed(scanTask, 100);
+        requestEventScan();
+    }
+
+    private void requestEventScan() {
+        if (!connected || !AccessibilityWorkPolicy.needsWindowEvents(PairingSession.isActive(), WifiApprovalSession.active())) return;
+        long delay = eventScans.request(SystemClock.elapsedRealtime());
+        if (delay >= 0) main.postDelayed(eventScanTask, delay);
     }
 
     private void scan() {

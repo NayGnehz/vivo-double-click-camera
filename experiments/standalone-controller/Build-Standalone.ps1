@@ -50,12 +50,15 @@ if (Test-Path -LiteralPath $patchedClass) {
     } finally { $archive.Dispose() }
     $libs[0] = $filteredAdb
 }
+$assetRoot = Join-Path $buildRoot 'assets'
+Copy-Item -LiteralPath (Join-Path $controllerRoot 'assets') -Destination $assetRoot -Recurse
+$licensePacking = & (Join-Path $controllerRoot 'Pack-LicenseAssets.ps1') -StagingLicenseDirectory (Join-Path $assetRoot 'licenses')
 $unsigned = Join-Path $buildRoot 'unsigned.apk'
 $aligned = Join-Path $buildRoot 'aligned.apk'
 $apk = Join-Path $dist 'vivo-camera-standalone-1.0.apk'
 Invoke-Checked $aapt @('compile','--dir',(Join-Path $controllerRoot 'res'),'-o',(Join-Path $buildRoot 'resources.zip'))
 Invoke-Checked $aapt @('link','-o',$unsigned,'--manifest',(Join-Path $controllerRoot 'AndroidManifest.xml'),
-    '-I',$androidJar,'-A',(Join-Path $controllerRoot 'assets'),(Join-Path $buildRoot 'resources.zip'),
+    '-I',$androidJar,'-A',$assetRoot,(Join-Path $buildRoot 'resources.zip'),
     '--min-sdk-version','31','--target-sdk-version','36')
 $sources = @((Get-ChildItem -LiteralPath (Join-Path $controllerRoot 'src') -Filter '*.java' -Recurse).FullName)
 Invoke-Checked $javac (@('-encoding','UTF-8','--release','8','-classpath',(($androidJar + ';') + ($libs -join ';')),'-d',$classes) + $sources)
