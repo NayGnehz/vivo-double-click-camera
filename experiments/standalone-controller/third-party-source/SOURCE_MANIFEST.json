@@ -1,0 +1,28 @@
+{
+  "library": "com.github.MuntashirAkon.spake2-java:spake2-android:2.2.1",
+  "tag": {
+    "sha": "7615ddd680b990e14513ebb66eac4cb0dbf82464",
+    "type": "commit",
+    "url": "https://api.github.com/repos/MuntashirAkon/spake2-java/git/commits/7615ddd680b990e14513ebb66eac4cb0dbf82464"
+  },
+  "native_gitlink": {
+    "path": "android/src/main/cpp/spake2-c",
+    "mode": "160000",
+    "type": "commit",
+    "sha": "0d15933e5ba3e662cb01245a7ac0dc9fca3eac31"
+  },
+  "archives": [
+    {
+      "file": "spake2-java-2.2.1.zip",
+      "source": "https://codeload.github.com/MuntashirAkon/spake2-java/zip/refs/tags/2.2.1",
+      "bytes": 110188,
+      "sha256": "c3f46fe17d5078613ab319d431fcb7a03b88b64d7cd377f6c0ed14f925053e53"
+    },
+    {
+      "file": "spake2-c-0d15933e5ba3e662cb01245a7ac0dc9fca3eac31.zip",
+      "source": "https://codeload.github.com/MuntashirAkon/spake2-c/zip/0d15933e5ba3e662cb01245a7ac0dc9fca3eac31",
+      "bytes": 38936,
+      "sha256": "0f1ae5da428e4f8ddea49e0e33dcfe07d2ac2114443793b8508bdc4dd48e1eec"
+    }
+  ]
+}

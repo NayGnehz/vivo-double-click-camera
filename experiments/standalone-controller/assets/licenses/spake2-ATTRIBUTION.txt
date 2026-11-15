@@ -1,0 +1,12 @@
+SPAKE2-Android 2.2.1
+Copyright 2021 Muntashir Al-Islam
+Licensed under GNU LGPL version 3. The library and its use in this application are covered by that license.
+
+Source: https://github.com/MuntashirAkon/spake2-java/tree/2.2.1
+Native source: https://github.com/MuntashirAkon/spake2-c/tree/0d15933e5ba3e662cb01245a7ac0dc9fca3eac31
+The native revision is the gitlink in the 2.2.1 release.
+
+See spake2-LGPL-3.0.txt, GNU-GPL-3.0.txt, spake2-c-LGPL-3.0.txt, GNU-LGPL-2.1.txt, and spake2-c-THIRD-PARTY-NOTICES.txt.
+The included native SHA-512 source is LGPL-2.1-or-later. Its other upstream native notices include ISC, MIT, and Apache-2.0.
+
+Nothing in this application's notices is intended to restrict modification of the LGPL-covered portions or reverse engineering for debugging such modifications.

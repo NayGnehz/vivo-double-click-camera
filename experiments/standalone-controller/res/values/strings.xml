@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_accessibility_description">仅在您点击“自动配对”后的两分钟内，打开系统配对码窗口，读取本机无线调试的配对码和端口。配对成功后自动关闭本服务。不会读取其他应用，不会监听或拦截按键，日常双击相机不依赖此服务。</string>
+</resources>

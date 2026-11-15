@@ -1,0 +1,20 @@
+LibADB Android 3.1.1 attribution
+
+Copyright 2021 Muntashir Al-Islam.
+Upstream offers GPL-3.0-or-later OR Apache-2.0. This distribution uses the Apache-2.0 option for LibADB's contributions. Additional original licenses remain applicable:
+
+BSD-3-Clause:
+Copyright 2013 Cameron Gutman (AdbConnection.java, AdbProtocol.java, AdbStream.java).
+Copyright 2020 Sam Palmer (AdbAuthenticationFailedException.java).
+The license text is reproduced in libadb-BSD-3-Clause.txt.
+
+MIT:
+Copyright 2013 Google Inc. (PRNGFixes.java).
+The license text is reproduced in libadb-MIT.txt.
+
+Additional notices in android/AdbMdns.java:
+Copyright 2020 南宫雪珊
+Copyright 2022 Muntashir Al-Islam
+
+Source: https://github.com/MuntashirAkon/libadb-android/tree/3.1.1/libadb/src/main/java/io/github/muntashirakon/adb
+SPDX declarations and copyright notices checked against this exact tag.

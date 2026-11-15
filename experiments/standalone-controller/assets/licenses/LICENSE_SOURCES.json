@@ -1,0 +1,127 @@
+[
+  {
+    "file": "AndroidX-annotation-LICENSE.txt",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1.jar#META-INF/androidx/annotation/annotation/LICENSE.txt",
+    "sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+  },
+  {
+    "file": "BoringSSL-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/boringssl/3adc3d1aba162a578e2547f329fcce8659b8e89c/LICENSE",
+    "sha256": "827c8d8fc207c2392794eef9e00fe246f9f61fdcc132556c275be3dd8c3cd97f"
+  },
+  {
+    "file": "BoringSSL-fiat-AUTHORS.txt",
+    "source": "https://raw.githubusercontent.com/google/boringssl/3adc3d1aba162a578e2547f329fcce8659b8e89c/third_party/fiat/AUTHORS",
+    "sha256": "ad74c036a6afaedc418fed65f171c877c2f74a4c70938a03930aa11c98a20508"
+  },
+  {
+    "file": "BoringSSL-fiat-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/boringssl/3adc3d1aba162a578e2547f329fcce8659b8e89c/third_party/fiat/LICENSE",
+    "sha256": "9eacbcb81be660840c714a560a9d65ba07913db98dd4baf969f78dd499fdd60f"
+  },
+  {
+    "file": "BouncyCastle-LICENSE.html",
+    "source": "https://raw.githubusercontent.com/bcgit/bc-java/r1rv81/LICENSE.html",
+    "sha256": "edbbb10380b1271998b867a2e36b1cbee226e03d438726e1a91f80c5dde11849"
+  },
+  {
+    "file": "Conscrypt-Harmony-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/conscrypt/2.6.3/licenses/LICENSE.harmony.txt",
+    "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+  },
+  {
+    "file": "Conscrypt-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/conscrypt/2.6.3/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "file": "Conscrypt-NOTICE.txt",
+    "source": "https://raw.githubusercontent.com/google/conscrypt/2.6.3/NOTICE",
+    "sha256": "378a858f72823759ec0cff19b32e70b7d355dbf8f5810df484dc5e3d60ea8dbd"
+  },
+  {
+    "file": "Conscrypt-Netty-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/conscrypt/2.6.3/licenses/LICENSE.netty.txt",
+    "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+  },
+  {
+    "file": "GNU-GPL-3.0.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/libadb-android/3.1.1/LICENSES/GPL-3.0-or-later",
+    "sha256": "4cf69a0c7c6f0eea4f323a85554a11cd2e16fa2a92c97a2d5de1d2c696d8e597"
+  },
+  {
+    "file": "GNU-LGPL-2.1.txt",
+    "source": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt",
+    "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+  },
+  {
+    "file": "Kotlin-Boost-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.0.21/license/third_party/boost_LICENSE.txt",
+    "sha256": "8d8291caf1cee26d23acf3eb67c9f9a2d58f1c681b16a4fbe8cbfb9e3c0b5a9b"
+  },
+  {
+    "file": "Kotlin-GWT-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.0.21/license/third_party/gwt_license.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "file": "Kotlin-Guava-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.0.21/license/third_party/guava_license.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "file": "Kotlin-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.0.21/license/LICENSE.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "file": "Kotlin-upstream-NOTICE.txt",
+    "source": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.0.21/license/NOTICE.txt",
+    "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a"
+  },
+  {
+    "file": "libadb-ATTRIBUTION.txt",
+    "source": "Attribution from exact tag source headers and README",
+    "sha256": "23f87d740689958a7054275f1f21fc09714402f15733ea8e5d18e19e8a18a329"
+  },
+  {
+    "file": "libadb-Apache-2.0.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/libadb-android/3.1.1/LICENSES/Apache-2.0",
+    "sha256": "4557de501c3a82094c239a4d74e2e29993c188f6ebb28b668fedf942938e44f1"
+  },
+  {
+    "file": "libadb-BSD-3-Clause.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/libadb-android/3.1.1/LICENSES/BSD-3-Clause",
+    "sha256": "8a094def3661adcb92d2e9f462052fe2bd6365ecf659f229ae9703bd4c412024"
+  },
+  {
+    "file": "libadb-COPYING.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/libadb-android/3.1.1/COPYING",
+    "sha256": "dd5314a7504dc2c80aba35db43a8db2f9362bd5768af07e94539a3e2b6fc3275"
+  },
+  {
+    "file": "libadb-MIT.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/libadb-android/3.1.1/LICENSES/MIT",
+    "sha256": "57a5669100695db12465be9fb3995322e87da6aa64d06cccdbccbb53b1839821"
+  },
+  {
+    "file": "spake2-ATTRIBUTION.txt",
+    "source": "Attribution from exact tag source headers and README",
+    "sha256": "63ca6e9d4354107a4676c59399f4b1ec77933406c62bf4f03cad7dafc856c26e"
+  },
+  {
+    "file": "spake2-LGPL-3.0.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/spake2-java/2.2.1/LICENSE",
+    "sha256": "a5681bf9b05db14d86776930017c647ad9e6e56ff6bbcfdf21e5848288dfaf1b"
+  },
+  {
+    "file": "spake2-c-LGPL-3.0.txt",
+    "source": "https://raw.githubusercontent.com/MuntashirAkon/spake2-c/0d15933e5ba3e662cb01245a7ac0dc9fca3eac31/LICENSE",
+    "sha256": "a5681bf9b05db14d86776930017c647ad9e6e56ff6bbcfdf21e5848288dfaf1b"
+  },
+  {
+    "file": "spake2-c-THIRD-PARTY-NOTICES.txt",
+    "source": "Verbatim header extraction; exact source URLs in file",
+    "sha256": "279a3d6620187a3af5a0cbe72e60eb43c18f406dc4978174fe7b3f39fd645a27"
+  }
+]
