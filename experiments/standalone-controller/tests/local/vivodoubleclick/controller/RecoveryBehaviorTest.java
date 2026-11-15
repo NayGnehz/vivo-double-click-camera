@@ -52,7 +52,7 @@ public final class RecoveryBehaviorTest {
         return WifiApprovalPolicy.decide(armed,unlocked,pkg,title,checkbox,checked,button,clicked,unchecked);
     }
     private static void approvals() {
-        check(!AccessibilityWorkPolicy.needsWindowEvents(false,false),"idle helper receives no window events");
+        check(!AccessibilityWorkPolicy.needsWindowEvents(false,false),"idle helper does not process windows");
         check(AccessibilityWorkPolicy.needsWindowEvents(true,false),"pairing activates events temporarily");
         check(AccessibilityWorkPolicy.needsWindowEvents(false,true),"network approval activates events temporarily");
         check(AccessibilityWorkPolicy.needsWindowEvents(true,true),"overlapping work shares event subscription");
@@ -93,8 +93,26 @@ public final class RecoveryBehaviorTest {
         check(!ControllerFlow.shouldClose(true,false),"stopped UI stays open");
         check(ControllerFlow.CLOSE_DELAY_MS==1000L,"visible success is retained for one second");
     }
+    private static void reopen() {
+        // Repeated opens, including hours after verification, retain only a
+        // historical launch state. A recent-success window is never stretched.
+        for (int open=0; open<50; open++) {
+            long now=10_000L+open*360_000L;
+            check(ControlStatePolicy.saved(10,10,-2,now,6_000)==ControlStatePolicy.Saved.STARTED,"same-boot launch survives reopening");
+            check(AccessibilityWorkPolicy.eventMask(false)!=0,"idle subscription remains valid on every return");
+            check(!AccessibilityWorkPolicy.needsWindowEvents(false,false),"reopening does not scan windows");
+        }
+        check(ControlStatePolicy.saved(11,10,-2,10000,6000)==ControlStatePolicy.Saved.UNKNOWN,"reboot invalidates saved launch");
+        check(ControlStatePolicy.saved(-1,-1,-1,10000,6000)==ControlStatePolicy.Saved.UNKNOWN,"unknown boot is never running");
+        check(ControlStatePolicy.saved(10,10,10,10000,6000)==ControlStatePolicy.Saved.STOPPED,"confirmed stop replaces launch");
+        check(ControlStatePolicy.saved(10,10,-2,1000,6000)==ControlStatePolicy.Saved.UNKNOWN,"invalid elapsed time rejected");
+        check(ControlStatePolicy.saved(10,10,-2,10000,0)==ControlStatePolicy.Saved.UNKNOWN,"no verification cannot claim launch");
+        check((AccessibilityWorkPolicy.eventMask(false)&0x800)==0,"idle excludes content-change events");
+        check((AccessibilityWorkPolicy.eventMask(true)&0x800)!=0,"active authorization receives content updates");
+        check(!RecoveryPolicy.recentSuccess(10,10,60_000,6000),"historical state cannot trigger verified-success exit");
+    }
     public static void main(String[] ignored) throws Exception {
-        recovery();approvals();flow();
+        recovery();approvals();flow();reopen();
         System.out.println("RecoveryBehaviorTest: "+checks+" assertions passed");
     }
 }

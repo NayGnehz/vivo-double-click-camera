@@ -38,6 +38,7 @@ public final class AutoPairService extends AccessibilityService {
     private long incompleteToken;
     private long incompleteSince;
     private boolean connected;
+    private int configuredEvents = -1;
     private static WeakReference<AutoPairService> live = new WeakReference<>(null);
     private WifiApprovalUi approvalUi;
     private ConnectivityManager connectivity;
@@ -58,14 +59,20 @@ public final class AutoPairService extends AccessibilityService {
     }
     void updateWorkState() {
         if (!connected) return;
-        AccessibilityServiceInfo info = getServiceInfo();
-        if (info != null) {
-            info.eventTypes = AccessibilityWorkPolicy.needsWindowEvents(PairingSession.isActive(), WifiApprovalSession.active())
-                    ? AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED : 0;
-            info.packageNames = WifiApprovalSession.active() ? new String[]{SETTINGS, "com.android.systemui"} : new String[]{SETTINGS};
-            info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
-            info.notificationTimeout = 100;
-            setServiceInfo(info);
+        boolean working = AccessibilityWorkPolicy.needsWindowEvents(PairingSession.isActive(), WifiApprovalSession.active());
+        // A zero event mask makes this service ineligible for event delivery. Keep
+        // a minimal valid subscription; idle callbacks never retrieve a window.
+        int events = AccessibilityWorkPolicy.eventMask(working);
+        if (events != configuredEvents) {
+            AccessibilityServiceInfo info = getServiceInfo();
+            if (info != null) {
+                info.eventTypes = events;
+                info.packageNames = new String[]{SETTINGS, "com.android.systemui"};
+                info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
+                info.notificationTimeout = 150;
+                setServiceInfo(info);
+                configuredEvents = events;
+            }
         }
         if (RecoveryScheduler.enabled(this) && !networkRegistered && connectivity != null) {
             NetworkRequest wifi = new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -84,15 +91,6 @@ public final class AutoPairService extends AccessibilityService {
 
     @Override protected void onServiceConnected() {
         super.onServiceConnected();
-        AccessibilityServiceInfo info = getServiceInfo();
-        if (info != null) {
-            info.packageNames = new String[] { SETTINGS };
-            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
-            info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
-            info.notificationTimeout = 100;
-            setServiceInfo(info);
-        }
         try { settingsResources = getPackageManager().getResourcesForApplication(SETTINGS); }
         catch (Exception unavailable) { settingsResources = null; }
         connected = true;
@@ -124,7 +122,8 @@ public final class AutoPairService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (!connected || event == null) return;
+        if (!connected || event == null
+                || !AccessibilityWorkPolicy.needsWindowEvents(PairingSession.isActive(), WifiApprovalSession.active())) return;
         String owner = event.getPackageName() == null ? "" : event.getPackageName().toString();
         if (!(PairingSession.isActive() && SETTINGS.equals(owner))
                 && !(WifiApprovalSession.active() && WifiApprovalUi.packageAllowed(owner))) return;
@@ -197,7 +196,7 @@ public final class AutoPairService extends AccessibilityService {
                 IN_FLIGHT.set(false);
             }
             PairingSession.finish(token, success ? "success" : "failed",
-                    success ? "配对成功，一次性配对辅助已关闭。现在可以启动或停止 1.0。"
+                    success ? "配对成功，助手已回到待机。可以启动双击相机。"
                             : "配对未完成。请确认无线调试已开启，并重新打开系统配对码窗口后再试。", success);
         }, "vivo-local-pair");
         worker.setDaemon(true);

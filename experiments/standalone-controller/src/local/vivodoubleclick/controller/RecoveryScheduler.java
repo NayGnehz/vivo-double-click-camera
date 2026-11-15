@@ -82,7 +82,7 @@ final class RecoveryScheduler {
         return needed(context) && RecoveryPolicy.mayAttempt(prefs(context).getInt("restore_attempts", 0));
     }
     static void success(Context context) {
-        prefs(context).edit().putInt("restore_completed_boot", boot(context))
+        prefs(context).edit().remove("controller_stopped_boot").putInt("restore_completed_boot", boot(context))
                 .putLong("restore_verified_elapsed", SystemClock.elapsedRealtime())
                 .putString("restore_message", "正在运行；无线调试已关闭，USB 调试保留。")
                 .putBoolean("restore_ok", true).putLong("restore_update", SystemClock.elapsedRealtime()).apply();
@@ -104,9 +104,18 @@ final class RecoveryScheduler {
         SharedPreferences p = prefs(context);
         return RecoveryPolicy.recentSuccess(boot(context), p.getInt("restore_completed_boot", -2), SystemClock.elapsedRealtime(), p.getLong("restore_verified_elapsed", 0));
     }
+    static ControlStatePolicy.Saved savedState(Context context) {
+        SharedPreferences p = prefs(context);
+        return ControlStatePolicy.saved(boot(context), p.getInt("restore_completed_boot", -2),
+                p.getInt("controller_stopped_boot", -2), SystemClock.elapsedRealtime(), p.getLong("restore_verified_elapsed", 0));
+    }
+    static void stopped(Context context) {
+        prefs(context).edit().putInt("controller_stopped_boot", boot(context))
+                .putInt("restore_suppressed_boot", boot(context)).putBoolean("restore_ok", false)
+                .remove("restore_completed_boot").putLong("restore_verified_elapsed", 0).apply();
+    }
     static void manualAction(Context context, String action) {
-        if ("stop".equals(action)) prefs(context).edit().putInt("restore_suppressed_boot", boot(context))
-                .putBoolean("restore_ok", false).putLong("restore_verified_elapsed", 0).remove("restore_completed_boot").apply();
+        if ("stop".equals(action)) prefs(context).edit().putInt("restore_suppressed_boot", boot(context)).apply();
         if ("start".equals(action)) prefs(context).edit().remove("restore_suppressed_boot").apply();
         JobScheduler scheduler = context.getSystemService(JobScheduler.class);
         if (scheduler != null && !"status".equals(action)) scheduler.cancel(JOB_ID);

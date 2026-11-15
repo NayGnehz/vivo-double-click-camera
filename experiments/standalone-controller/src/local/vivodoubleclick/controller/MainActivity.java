@@ -46,6 +46,8 @@ public final class MainActivity extends Activity {
     private LinearLayout settingsPanel;
     private Button settingsToggle;
     private Button autoPairButton;
+    private LinearLayout advancedPanel;
+    private Button advancedToggle;
     private EditText connectPort;
     private Switch recoverySwitch;
     private final Runnable autoClose = () -> {
@@ -54,8 +56,6 @@ public final class MainActivity extends Activity {
     private boolean busy;
     private boolean manualPairing;
     private boolean resumed;
-    private boolean checkedThisResume;
-    private long checkedPairUpdate;
     private SharedPreferences preferences;
     private volatile boolean destroyed;
     private final Runnable pairingUpdate = () -> {
@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         if ("restore_update".equals(key)) handler.post(() -> {
             if (destroyed || busy || pairingActive()) return;
             if (preferences.getBoolean("restore_ok", false) && RecoveryScheduler.recentlyVerified(this)) renderRecovered();
-            else showUnknown(preferences.getString("restore_message", "等待 Wi-Fi 自动恢复。"));
+            else refreshIfNeeded();
         });
         if (key != null && (key.startsWith("pair_") || "paired".equals(key))) {
             handler.removeCallbacks(pairingUpdate);
@@ -94,46 +94,32 @@ public final class MainActivity extends Activity {
         });
         scroll.addView(panel);
         text(panel, "Vivo 双击相机", 25).setTypeface(null, Typeface.BOLD);
-        text(panel, "1.0 独立控制器", 14);
-        state = text(panel, "状态未确认", 34);
+        state = text(panel, "待启动", 34);
         state.setTypeface(null, Typeface.BOLD);
         state.setPadding(0, dp(20), 0, dp(4));
         state.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        stateMessage = text(panel, "连接 Wi-Fi 后，可刷新状态或启动 1.0。", 16);
+        stateMessage = text(panel, "启动后，双击电源键打开相机。", 16);
         stateMessage.setPadding(0, 0, 0, dp(18));
-        connection = text(panel, "", 16);
-        connection.setTypeface(null, Typeface.BOLD);
-        pairingMessage = text(panel, "", 14);
-        pairingMessage.setTextColor(Color.DKGRAY);
-        pairingMessage.setPadding(0, dp(4), 0, dp(12));
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         panel.addView(actions);
-        primaryButton(actions, "启动 1.0", v -> runAction("start"));
+        primaryButton(actions, "启动", v -> runAction("start"));
         primaryButton(actions, "停止", v -> runAction("stop"));
-        primaryButton(actions, "刷新", v -> runAction("status"));
-        operations.add(button(panel, "关闭控制界面", v -> closeControlInterface()));
-        TextView exitHint = text(panel, "关闭界面不停止 1.0；USB 调试已开启时，会先关闭无线调试并保留 USB 调试，不必插线。手机重启并首次解锁后，连接 Wi-Fi 可自动恢复；晚些联网也可以。", 14);
-        exitHint.setTextColor(Color.DKGRAY);
-        exitHint.setPadding(0, dp(4), 0, dp(16));
-        settingsToggle = button(panel, "配对与设置  ▾", v -> setSettingsExpanded(settingsPanel.getVisibility() != View.VISIBLE));
+        text(panel, "关闭界面后，双击相机继续运行。", 14).setTextColor(Color.DKGRAY);
+        settingsToggle = button(panel, "设置  ▾", v -> setSettingsExpanded(settingsPanel.getVisibility() != View.VISIBLE));
         settingsPanel = new LinearLayout(this);
         settingsPanel.setOrientation(LinearLayout.VERTICAL);
         settingsPanel.setVisibility(View.GONE);
         panel.addView(settingsPanel);
-        text(settingsPanel, "仅首次使用，或系统已移除本应用的配对时，才需要配对。已配对可直接使用上方启停按钮。", 15);
-        autoPairButton = button(settingsPanel, "首次自动配对", v -> showAutoPairing());
+        connection = text(settingsPanel, "", 16);
+        connection.setTypeface(null, Typeface.BOLD);
+        pairingMessage = text(settingsPanel, "", 14);
+        pairingMessage.setTextColor(Color.DKGRAY);
+        pairingMessage.setPadding(0, dp(4), 0, dp(12));
+        autoPairButton = button(settingsPanel, "首次配对", v -> showAutoPairing());
         operations.add(autoPairButton);
-        operations.add(button(settingsPanel, "手动配对（备用）", v -> showPairing()));
-        operations.add(button(settingsPanel, "打开开发者选项", v -> {
-            try { startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)); }
-            catch (ActivityNotFoundException | SecurityException unavailable) { showSettingsHint(); }
-        }));
-        operations.add(button(settingsPanel, "打开无线调试", v -> {
-            if (!SettingsNavigation.openWireless(this)) showSettingsHint();
-        }));
         recoverySwitch = new Switch(this);
-        recoverySwitch.setText("开机和 Wi-Fi 联网后自动恢复");
+        recoverySwitch.setText("开机联网后自动启动");
         recoverySwitch.setChecked(RecoveryScheduler.enabled(this));
         settingsPanel.addView(recoverySwitch);
         recoverySwitch.setOnCheckedChangeListener((view, enabled) -> {
@@ -141,23 +127,46 @@ public final class MainActivity extends Activity {
             RecoveryScheduler.setEnabled(this, enabled);
             updateConnection();
         });
-        operations.add(button(settingsPanel, "开启／检查自动恢复助手", v -> {
+        operations.add(button(settingsPanel, "自动恢复权限", v -> {
             try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
             catch (ActivityNotFoundException | SecurityException unavailable) { showSettingsHint(); }
         }));
-        text(settingsPanel, "自动恢复需保留“双击相机：自动恢复助手”的无障碍开关，并在系统中允许本应用自启动。助手待机时不读取窗口；需要时只点网络授权的“允许”，不勾“始终允许”。重启后首次解锁，再连 Wi-Fi 即可恢复。", 14);
+        text(settingsPanel, "请允许应用自启动，并保持恢复助手开启。助手仅在配对和网络授权时读取窗口。", 14);
         permissionStatus = text(settingsPanel, "", 14);
+        advancedToggle = button(settingsPanel, "故障排查  ▾", v -> {
+            handler.removeCallbacks(autoClose);
+            boolean open = advancedPanel.getVisibility() != View.VISIBLE;
+            advancedPanel.setVisibility(open ? View.VISIBLE : View.GONE);
+            advancedToggle.setText(open ? "故障排查  ▴" : "故障排查  ▾");
+        });
+        advancedPanel = new LinearLayout(this);
+        advancedPanel.setOrientation(LinearLayout.VERTICAL);
+        advancedPanel.setVisibility(View.GONE);
+        settingsPanel.addView(advancedPanel);
+        operations.add(button(advancedPanel, "检查实时状态", v -> runAction("status")));
+        operations.add(button(advancedPanel, "手动配对", v -> showPairing()));
+        operations.add(button(advancedPanel, "开发者选项", v -> {
+            try { startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)); }
+            catch (ActivityNotFoundException | SecurityException unavailable) { showSettingsHint(); }
+        }));
+        operations.add(button(advancedPanel, "无线调试设置", v -> {
+            if (!SettingsNavigation.openWireless(this)) showSettingsHint();
+        }));
         connectPort = new EditText(this);
         connectPort.setInputType(InputType.TYPE_CLASS_NUMBER);
         connectPort.setSingleLine(true);
         connectPort.setHint("连接端口（通常留空，自动发现）");
-        settingsPanel.addView(connectPort);
-        text(settingsPanel, "自动发现失败时，填写无线调试主页面的连接端口。此处不是配对码窗口的端口。\n\n点击启动时，应用会开启并保留“USB 调试”，让关闭 Wi-Fi 后的 1.0 继续运行，不必插线。停止和刷新不会修改此开关。\n\n助手只在配对或网络授权时读取系统窗口，其他时间待机；日常双击由 1.0 独立运行。", 14);
-        detail = text(settingsPanel, "尚无运行记录。", 13);
+        advancedPanel.addView(connectPort);
+        text(advancedPanel, "连接端口通常留空。配对码窗口中的端口不能用于连接。", 14);
+        text(advancedPanel, "检查实时状态需要临时开启无线调试。检查正常后会关闭无线调试，保留 USB 调试。", 14);
+        detail = text(advancedPanel, "暂无记录。", 13);
         detail.setTextIsSelectable(true);
         detail.setVisibility(View.GONE);
-        button(settingsPanel, "显示／隐藏运行记录", v -> detail.setVisibility(detail.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        button(advancedPanel, "查看运行记录", v -> detail.setVisibility(detail.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        operations.add(button(settingsPanel, "关闭控制界面", v -> closeControlInterface()));
         setContentView(scroll);
+        if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::closeControlInterface);
         preferences.registerOnSharedPreferenceChangeListener(preferenceListener);
         updateConnection();
     }
@@ -178,8 +187,9 @@ public final class MainActivity extends Activity {
         operations.add(button);
     }
     private void setSettingsExpanded(boolean expanded) {
+        if (expanded) handler.removeCallbacks(autoClose);
         settingsPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        settingsToggle.setText(expanded ? "配对与设置  ▴" : "配对与设置  ▾");
+        settingsToggle.setText(expanded ? "设置  ▴" : "设置  ▾");
     }
     private void showSettingsHint() {
         new AlertDialog.Builder(this).setMessage("请在系统设置中打开“开发者选项 → 无线调试”。")
@@ -243,7 +253,10 @@ public final class MainActivity extends Activity {
                                 .putString("pair_message", "本次配对未完成，请确认配对窗口仍打开、端口和配对码正确。")
                                 .putLong("pair_update", System.currentTimeMillis()).apply();
                         setBusy(false); updateConnection();
-                        detail.setText(error.getClass().getSimpleName() + ": " + error.getMessage());
+                        setSettingsExpanded(true);
+            advancedPanel.setVisibility(View.VISIBLE);
+            advancedToggle.setText("故障排查  ▴");
+            detail.setText(error.getClass().getSimpleName() + ": " + error.getMessage());
                         detail.setVisibility(View.VISIBLE);
                     });
                 }
@@ -292,19 +305,18 @@ public final class MainActivity extends Activity {
         try { port = parsePort(connectPort.getText().toString(), true); }
         catch (IllegalArgumentException error) { setSettingsExpanded(true); connectPort.setError("连接端口应为 1–65535，也可以留空"); return; }
         RecoveryScheduler.manualAction(this, action);
-        checkedThisResume = true;
-        checkedPairUpdate = preferences.getLong("pair_update", 0);
         setBusy(true);
-        showUnknown("start".equals(action) ? "正在连接并启动 1.0…" : "stop".equals(action) ? "正在停止 1.0…" : "正在查询状态…");
+        showUnknown("start".equals(action) ? "正在启动…" : "stop".equals(action) ? "正在停止…" : "正在查询状态…");
         worker.execute(() -> {
             try {
                 JSONObject result = ControllerRuntime.execute(getApplicationContext(), action, port, () -> {
                     if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Controller action interrupted");
                 });
                 if (result.optBoolean("ok") && "RUNNING".equals(result.optString("state"))) RecoveryScheduler.success(this);
+                if ("STOPPED".equals(result.optString("state"))) RecoveryScheduler.stopped(this);
                 handler.post(() -> { if (!destroyed) render(result); });
             } catch (Exception error) {
-                reportError("操作未完成，未自动关闭界面。请检查 Wi-Fi、恢复助手及调试授权；监听器可能仍在运行。", error);
+                reportError("操作未完成。请检查 Wi-Fi 与调试授权，详情见设置。", error);
             }
         });
     }
@@ -317,8 +329,6 @@ public final class MainActivity extends Activity {
     }
 
     private void render(JSONObject result) {
-        checkedThisResume = true;
-        checkedPairUpdate = preferences.getLong("pair_update", 0);
         setBusy(false); updateConnection();
         String actual = result.optString("state", "UNKNOWN");
         boolean running = "RUNNING".equals(actual);
@@ -326,9 +336,10 @@ public final class MainActivity extends Activity {
         if (running || stopped) {
             state.setText(running ? "正在运行" : "已停止");
             state.setTextColor(running ? Color.rgb(24, 112, 57) : Color.DKGRAY);
-            stateMessage.setText(running ? "双击电源键即可打开相机。" : "点击“启动 1.0”恢复双击相机。");
+            stateMessage.setText(running ? "双击电源键即可打开相机。" : "点击“启动”开启双击相机。");
             if (!result.optBoolean("ok")) stateMessage.append("\n本次操作未完成，当前状态已重新确认。");
-        } else showUnknown("暂时无法确认监听状态。请检查 Wi-Fi 和无线调试，再刷新。");
+        } else showSavedState("本次检查未完成，请在设置中查看详情。");
+        if (!result.optBoolean("ok")) setSettingsExpanded(true);
         detail.setText(result.optString("message") + "\n\n" + result.optString("log"));
         if (!result.optBoolean("ok")) detail.setVisibility(View.VISIBLE);
         handler.removeCallbacks(autoClose);
@@ -346,10 +357,11 @@ public final class MainActivity extends Activity {
         Log.e(TAG, message, error);
         handler.post(() -> {
             if (destroyed) return;
-            checkedThisResume = true;
-            checkedPairUpdate = preferences.getLong("pair_update", 0);
             setBusy(false); updateConnection();
-            showUnknown(message);
+            showSavedState(message);
+            setSettingsExpanded(true);
+            advancedPanel.setVisibility(View.VISIBLE);
+            advancedToggle.setText("故障排查  ▴");
             detail.setText(error.getClass().getSimpleName() + ": " + error.getMessage()); detail.setVisibility(View.VISIBLE);
         });
     }
@@ -373,39 +385,45 @@ public final class MainActivity extends Activity {
             pairingMessage.setText(message);
         } else {
             connection.setText(paired ? "已配对" : "尚未配对");
-            if ("success".equals(status)) pairingMessage.setText("配对已完成，可直接使用上方启停按钮。");
+            if ("success".equals(status)) pairingMessage.setText("配对已完成。");
             else if (!message.isEmpty()) pairingMessage.setText(message);
-            else pairingMessage.setText(paired ? "配对身份已保存，无需重复配对。" : "展开“配对与设置”完成首次配对。");
+            else pairingMessage.setText(paired ? "配对身份已保存，无需重复配对。" : "在设置中完成首次配对。");
         }
-        autoPairButton.setText(paired ? "重新配对（通常无需）" : "首次自动配对");
+        autoPairButton.setText(paired ? "重新配对" : "首次配对");
+        pairingMessage.setVisibility(pairingActive() || "failed".equals(status) ? View.VISIBLE : View.GONE);
         boolean automatic = checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED;
         permissionStatus.setText(automatic ? (RecoveryScheduler.assistantEnabled(this) ? "自动恢复授权已就绪。" : "调试权限已就绪，请开启自动恢复助手。") : "首次连接前，请手动开启无线调试。");
         updateControls();
     }
-    private void refreshIfNeeded() {
-        if (!resumed || destroyed || busy || pairingActive() || !preferences.getBoolean("paired", false)) return;
-        if (RecoveryScheduler.enabled(this) && !RecoveryScheduler.assistantEnabled(this)) {
-            setSettingsExpanded(true);
-            showUnknown("请先开启自动恢复助手，并允许本应用自启动；助手待机时不读取窗口。");
-            return;
-        }
-        if (RecoveryScheduler.recentlyVerified(this) && preferences.getBoolean("restore_ok", false)) {
-            renderRecovered();
-            return;
-        }
-        if (RecoveryScheduler.needed(this)) {
-            RecoveryScheduler.schedule(this);
-            showUnknown(preferences.getString("restore_message", "等待 Wi-Fi 自动恢复。"));
-            return;
-        }
-        long update = preferences.getLong("pair_update", 0);
-        boolean newSuccess = "success".equals(preferences.getString("pair_status", "")) && update != checkedPairUpdate;
-        if (checkedThisResume && !newSuccess) return;
-        // Mark before starting so preference callbacks cannot form a refresh loop.
-        checkedThisResume = true;
-        checkedPairUpdate = update;
-        runAction("status");
+    private void showSavedState(String message) {
+        ControlStatePolicy.Saved saved = RecoveryScheduler.savedState(this);
+        state.setText(saved == ControlStatePolicy.Saved.STARTED ? "已启动" : saved == ControlStatePolicy.Saved.STOPPED ? "已停止" : "待启动");
+        state.setTextColor(saved == ControlStatePolicy.Saved.STARTED ? Color.rgb(24,112,57) : Color.DKGRAY);
+        String hint = saved == ControlStatePolicy.Saved.STARTED ? "本次开机已确认启动。实时检查见设置。"
+                : saved == ControlStatePolicy.Saved.STOPPED ? "点击“启动”开启双击相机。" : "连接 Wi-Fi 后点击“启动”。";
+        stateMessage.setText(message == null ? hint : message);
     }
+    private void refreshIfNeeded() {
+        if (!resumed || destroyed || busy || pairingActive()) return;
+        if (!preferences.getBoolean("paired", false)) {
+            state.setText("首次使用");
+            stateMessage.setText("在设置中完成一次配对，即可使用。");
+            setSettingsExpanded(true);
+            return;
+        }
+        // Opening the UI is passive: it neither toggles debugging nor starts an
+        // authorization session. A saved launch is explicitly labelled as such.
+        showSavedState(null);
+        if (RecoveryScheduler.savedState(this) == ControlStatePolicy.Saved.UNKNOWN) {
+            if (RecoveryScheduler.needed(this)) {
+                RecoveryScheduler.schedule(this);
+                stateMessage.setText(preferences.getString("restore_message", "等待 Wi-Fi 自动启动。"));
+            } else if (RecoveryScheduler.enabled(this) && !RecoveryScheduler.assistantEnabled(this)) {
+                stateMessage.setText("自动启动需要开启恢复助手，也可以手动启动。");
+            }
+        }
+    }
+    @Override public void onBackPressed() { closeControlInterface(); }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
@@ -416,7 +434,6 @@ public final class MainActivity extends Activity {
         super.onResume();
         resumed = true;
         RecoveryScheduler.onUserPresent(this);
-        checkedThisResume = false;
         PairingSession.recoverInterrupted(getApplicationContext());
         if (connection == null) return;
         updateConnection(); refreshIfNeeded();
